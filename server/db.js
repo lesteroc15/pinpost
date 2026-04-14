@@ -2,12 +2,14 @@ const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
 
-console.log('DB URL present:', !!process.env.DATABASE_URL);
+const url = process.env.DATABASE_URL || '';
+const isInternal = url.includes('.railway.internal');
+console.log('DB URL present:', !!url, 'internal:', isInternal);
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  connectionTimeoutMillis: 10000,
-  ssl: process.env.DATABASE_URL?.includes('.railway.internal') ? false : { rejectUnauthorized: false }
+  connectionString: url,
+  connectionTimeoutMillis: 15000,
+  ...(isInternal ? {} : { ssl: { rejectUnauthorized: false } })
 });
 
 pool.on('error', (err) => {
@@ -15,6 +17,21 @@ pool.on('error', (err) => {
 });
 
 async function initDb() {
+  // Debug DNS resolution
+  const dns = require('dns');
+  const parsedUrl = new URL(url);
+  try {
+    const addrs = await dns.promises.resolve(parsedUrl.hostname);
+    console.log('DNS resolved:', parsedUrl.hostname, '->', addrs);
+  } catch (e) {
+    console.log('DNS resolve failed:', e.message);
+    try {
+      const addrs6 = await dns.promises.resolve6(parsedUrl.hostname);
+      console.log('DNS IPv6 resolved:', addrs6);
+    } catch (e2) {
+      console.log('DNS IPv6 also failed:', e2.message);
+    }
+  }
   console.log('Connecting to database...');
   const client = await pool.connect();
   console.log('Connected to database');
