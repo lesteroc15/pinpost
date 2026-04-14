@@ -6,7 +6,8 @@ console.log('DB URL present:', !!process.env.DATABASE_URL);
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  connectionTimeoutMillis: 10000
+  connectionTimeoutMillis: 10000,
+  ssl: { rejectUnauthorized: false }
 });
 
 pool.on('error', (err) => {
