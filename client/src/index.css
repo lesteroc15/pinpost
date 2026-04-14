@@ -1,0 +1,32 @@
+@import 'leaflet/dist/leaflet.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #f9fafb;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.btn-primary {
+  @apply w-full bg-brand-500 text-white font-semibold py-4 px-6 rounded-2xl text-lg active:bg-brand-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.btn-secondary {
+  @apply w-full bg-gray-100 text-gray-700 font-semibold py-4 px-6 rounded-2xl text-lg active:bg-gray-200 transition-colors;
+}
+
+.input-field {
+  @apply w-full border border-gray-200 rounded-2xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white;
+}
+
+.card {
+  @apply bg-white rounded-2xl p-4 shadow-sm border border-gray-100;
+}

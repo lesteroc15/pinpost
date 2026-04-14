@@ -1,0 +1,8 @@
+[build]
+buildCommand = "npm run build"
+
+[deploy]
+startCommand = "npm start"
+
+[[volumes]]
+mountPath = "/app/uploads"
