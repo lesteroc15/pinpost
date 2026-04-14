@@ -9,7 +9,7 @@ console.log('DB URL present:', !!url, 'internal:', isInternal);
 const pool = new Pool({
   connectionString: url,
   connectionTimeoutMillis: 15000,
-  ...(isInternal ? {} : { ssl: { rejectUnauthorized: false } })
+  ssl: { rejectUnauthorized: false }
 });
 
 pool.on('error', (err) => {
