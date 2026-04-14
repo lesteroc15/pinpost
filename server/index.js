@@ -51,12 +51,23 @@ async function createSuperAdmin() {
 
 async function start() {
   ensureUploadDir();
-  await initDb();
-  await createSuperAdmin();
+  // Start the server first so Railway sees it's healthy
   app.listen(PORT, () => console.log(`PinPost running on port ${PORT}`));
+  // Then init DB (retry on failure)
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    try {
+      console.log(`DB init attempt ${attempt}...`);
+      console.log('DB URL host:', process.env.DATABASE_URL?.replace(/\/\/.*@/, '//***@'));
+      await initDb();
+      await createSuperAdmin();
+      console.log('Startup complete');
+      return;
+    } catch (err) {
+      console.error(`DB init attempt ${attempt} failed:`, err.message);
+      if (attempt < 5) await new Promise(r => setTimeout(r, 3000));
+    }
+  }
+  console.error('All DB init attempts failed. Server running without DB.');
 }
 
-start().catch(err => {
-  console.error('Startup error:', err);
-  process.exit(1);
-});
+start();
