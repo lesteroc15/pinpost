@@ -5,35 +5,48 @@ const fs = require('fs');
 
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '../../uploads');
 
+function labelSvg(text, width) {
+  const fontSize = 42;
+  const padX = 20;
+  const padY = 12;
+  // Dark translucent banner with white text in bottom-left
+  return `<svg width="${width}" height="${fontSize + padY * 2 + 24}" xmlns="http://www.w3.org/2000/svg">
+    <rect x="${padX}" y="24" rx="6" ry="6" width="${text.length * 24 + padX * 2}" height="${fontSize + padY * 2}" fill="rgba(0,0,0,0.72)" />
+    <text x="${padX * 2}" y="${fontSize + padY + 14}" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="${fontSize}" font-weight="700" fill="white" letter-spacing="1">${text}</text>
+  </svg>`;
+}
+
 async function createCollage(imagePaths) {
   if (imagePaths.length === 1) return imagePaths[0];
 
-  const before = await sharp(imagePaths[0]).resize(600, 450, { fit: 'cover' }).toBuffer();
-  const after = await sharp(imagePaths[1]).resize(600, 450, { fit: 'cover' }).toBuffer();
+  const CELL_W = 600;
+  const CELL_H = 450;
 
-  const labelBefore = await sharp({
-    create: { width: 600, height: 450, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } }
-  })
-    .composite([{ input: before }])
-    .png()
+  // Resize each image to the cell size
+  const before = await sharp(imagePaths[0]).resize(CELL_W, CELL_H, { fit: 'cover' }).toBuffer();
+  const after = await sharp(imagePaths[1]).resize(CELL_W, CELL_H, { fit: 'cover' }).toBuffer();
+
+  // Create labels as SVG buffers
+  const beforeLabel = Buffer.from(labelSvg('BEFORE', CELL_W));
+  const afterLabel = Buffer.from(labelSvg('AFTER', CELL_W));
+
+  // Composite label onto each image (bottom-left)
+  const beforeWithLabel = await sharp(before)
+    .composite([{ input: beforeLabel, gravity: 'southwest' }])
     .toBuffer();
-
-  const labelAfter = await sharp({
-    create: { width: 600, height: 450, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } }
-  })
-    .composite([{ input: after }])
-    .png()
+  const afterWithLabel = await sharp(after)
+    .composite([{ input: afterLabel, gravity: 'southwest' }])
     .toBuffer();
 
   const collageName = `collage_${uuidv4()}.jpg`;
   const collagePath = path.join(UPLOAD_DIR, collageName);
 
   await sharp({
-    create: { width: 1200, height: 450, channels: 3, background: { r: 255, g: 255, b: 255 } }
+    create: { width: CELL_W * 2, height: CELL_H, channels: 3, background: { r: 255, g: 255, b: 255 } }
   })
     .composite([
-      { input: labelBefore, top: 0, left: 0 },
-      { input: labelAfter, top: 0, left: 600 }
+      { input: beforeWithLabel, top: 0, left: 0 },
+      { input: afterWithLabel, top: 0, left: CELL_W }
     ])
     .jpeg({ quality: 90 })
     .toFile(collagePath);

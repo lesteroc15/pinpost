@@ -5,3 +5,6 @@ client/dist/
 .env
 uploads/
 *.json.bak
+SECRETS.md
+google-credentials.json
+client_secret_*.json
