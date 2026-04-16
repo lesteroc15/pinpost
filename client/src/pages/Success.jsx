@@ -17,9 +17,7 @@ export default function Success() {
       <h1 className="text-3xl font-bold text-gray-900 mb-2">Posted!</h1>
       <p className="text-gray-500 mb-2">Your check-in is being posted to</p>
       <div className="flex gap-3 justify-center mb-8">
-        <span className="bg-gray-100 text-gray-600 px-3 py-1.5 rounded-full text-sm font-medium">Google Maps</span>
-        <span className="bg-gray-100 text-gray-600 px-3 py-1.5 rounded-full text-sm font-medium">Facebook</span>
-        <span className="bg-gray-100 text-gray-600 px-3 py-1.5 rounded-full text-sm font-medium">Instagram</span>
+        <span className="bg-green-100 text-green-700 px-3 py-1.5 rounded-full text-sm font-medium">Google Maps</span>
       </div>
       <p className="text-gray-400 text-sm mb-6">Redirecting in a moment...</p>
       <button

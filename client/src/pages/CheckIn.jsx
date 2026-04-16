@@ -161,26 +161,7 @@ export default function CheckIn() {
             required
           />
 
-          {/* Social media alternative */}
-          <label className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              className="mt-0.5 w-5 h-5 accent-brand-500"
-              checked={useSocialDescription}
-              onChange={e => setUseSocialDescription(e.target.checked)}
-            />
-            <span className="text-sm text-gray-600">Use different caption for social media posts</span>
-          </label>
-
-          {useSocialDescription && (
-            <textarea
-              className="input-field resize-none"
-              rows={3}
-              placeholder="Social media caption (more casual tone, can include hashtags)..."
-              value={socialDescription}
-              onChange={e => setSocialDescription(e.target.value)}
-            />
-          )}
+          {/* Social media alternative — hidden until Meta integration is live */}
         </div>
 
         {/* Photos */}

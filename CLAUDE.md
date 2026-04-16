@@ -167,3 +167,7 @@ META_APP_SECRET=...            # MISSING in prod
 - Postgres is Railway-managed (internal .railway.internal hostname)
 - DB init runs on every boot with 5-attempt retry
 - Super admin auto-created from env vars on first boot
+
+## Knowledge Base
+For strategy decisions (marketing, pricing, scaling, tech stack), consult playbooks at:
+`/Users/lesteroc/Library/Mobile Documents/com~apple~CloudDocs/SH/Claude/knowledge-base/playbooks/`

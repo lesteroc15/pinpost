@@ -106,24 +106,10 @@ export default function Settings() {
           )}
         </div>
 
-        {/* Facebook / Instagram */}
-        <div className="card space-y-3">
+        {/* Facebook / Instagram — coming soon */}
+        <div className="card space-y-3 opacity-60">
           <h2 className="font-semibold text-gray-900">Facebook & Instagram</h2>
-          {org?.meta_page_id ? (
-            <div>
-              <p className="text-sm text-green-600 font-medium">Facebook Page connected</p>
-              {org.meta_ig_account_id
-                ? <p className="text-sm text-green-600">Instagram connected</p>
-                : <p className="text-sm text-yellow-600">Instagram not detected. Make sure it's a Business account linked to your Facebook Page.</p>
-              }
-              <a href="/api/admin/meta/connect" className="text-brand-500 text-sm mt-1 block">Reconnect</a>
-            </div>
-          ) : (
-            <div>
-              <p className="text-sm text-gray-500 mb-3">Connect to post check-ins to Facebook and Instagram automatically.</p>
-              <a href="/api/admin/meta/connect" className="btn-secondary block text-center !py-3">Connect Facebook/Instagram</a>
-            </div>
-          )}
+          <p className="text-sm text-gray-500">Social media posting coming soon. Contact your provider to enable this feature.</p>
         </div>
 
         <button

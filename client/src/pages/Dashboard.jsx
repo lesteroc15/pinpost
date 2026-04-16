@@ -49,8 +49,8 @@ export default function Dashboard() {
             <div className="text-brand-100 text-xs">On Google</div>
           </div>
           <div className="bg-white/10 rounded-xl px-4 py-2 text-center flex-1">
-            <div className="text-2xl font-bold">{checkins.filter(c => c.fb_status === 'posted').length}</div>
-            <div className="text-brand-100 text-xs">On Social</div>
+            <div className="text-2xl font-bold">{new Set(checkins.map(c => c.address)).size}</div>
+            <div className="text-brand-100 text-xs">Locations</div>
           </div>
         </div>
       </div>
@@ -115,9 +115,7 @@ export default function Dashboard() {
               </div>
               <div className="flex gap-2 mt-3">
                 {[
-                  { label: 'Google', status: c.gbp_status },
-                  { label: 'FB', status: c.fb_status },
-                  { label: 'IG', status: c.ig_status }
+                  { label: 'Google Maps', status: c.gbp_status }
                 ].map(({ label, status }) => (
                   <span key={label} className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[status] || STATUS_COLORS.pending}`}>
                     {label}: {status || 'pending'}
