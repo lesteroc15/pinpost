@@ -116,10 +116,13 @@ router.get('/gbp/accounts', requireAuth, requireAdmin, async (req, res) => {
 
   try {
     const accessToken = await refreshAccessToken(org.gbp_refresh_token);
+    console.log('GBP: Got access token, fetching accounts...');
     const accounts = await listAccounts(accessToken);
+    console.log('GBP: Accounts response:', JSON.stringify(accounts).slice(0, 500));
     res.json(accounts);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('GBP accounts error:', err.response?.data || err.message);
+    res.status(500).json({ error: err.response?.data?.error?.message || err.message });
   }
 });
 
