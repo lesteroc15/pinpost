@@ -86,8 +86,8 @@ export default function CheckIn() {
     photos.forEach(p => form.append('photos', p));
 
     try {
-      await api.post('/checkins', form, { headers: { 'Content-Type': 'multipart/form-data' } });
-      navigate('/success');
+      const { data } = await api.post('/checkins', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+      navigate(`/success?id=${data.checkinId}`);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to submit. Please try again.');
     } finally {

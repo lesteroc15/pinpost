@@ -5,7 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 const { pool } = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { generateDescription } = require('../services/claude');
-const { createCollage, UPLOAD_DIR } = require('../services/image');
+const { createCollage, compressImage, UPLOAD_DIR } = require('../services/image');
 const { createLocalPost, refreshAccessToken } = require('../services/gbp');
 const { postToFacebook, postToInstagram, getPageAccessToken } = require('../services/meta');
 
@@ -15,7 +15,16 @@ const storage = multer.diskStorage({
   destination: UPLOAD_DIR,
   filename: (req, file, cb) => cb(null, `${uuidv4()}${path.extname(file.originalname)}`)
 });
-const upload = multer({ storage, limits: { files: 10, fileSize: 20 * 1024 * 1024 } });
+const upload = multer({
+  storage,
+  limits: { files: 10, fileSize: 20 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith('image/')) {
+      return cb(new Error('Only image files are allowed'));
+    }
+    cb(null, true);
+  }
+});
 
 // Generate AI description
 router.post('/generate-description', requireAuth, async (req, res) => {
@@ -46,6 +55,11 @@ router.post('/', requireAuth, upload.array('photos', 10), async (req, res) => {
   }
 
   const photoPaths = (req.files || []).map(f => f.filename);
+
+  // Compress uploaded images
+  for (const filename of photoPaths) {
+    try { await compressImage(path.join(UPLOAD_DIR, filename)); } catch {}
+  }
   let collagePath = null;
 
   if (photoPaths.length >= 2) {
@@ -140,6 +154,29 @@ router.get('/', requireAuth, async (req, res) => {
     [req.user.orgId]
   );
   res.json(rows);
+});
+
+// Get single check-in (for status polling after submit)
+router.get('/:id', requireAuth, async (req, res) => {
+  const { rows } = await pool.query(
+    'SELECT * FROM checkins WHERE id = $1 AND org_id = $2',
+    [req.params.id, req.user.orgId]
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'Not found' });
+  res.json(rows[0]);
+});
+
+// Delete check-in (admin only)
+router.delete('/:id', requireAuth, async (req, res) => {
+  if (req.user.role !== 'admin' && req.user.role !== 'super_admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  const { rowCount } = await pool.query(
+    'DELETE FROM checkins WHERE id = $1 AND org_id = $2',
+    [req.params.id, req.user.orgId]
+  );
+  if (!rowCount) return res.status(404).json({ error: 'Not found' });
+  res.json({ success: true });
 });
 
 module.exports = router;

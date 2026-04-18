@@ -24,9 +24,17 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState('list');
 
-  useEffect(() => {
+  function loadCheckins() {
     api.get('/checkins').then(r => { setCheckins(r.data); setLoading(false); }).catch(() => setLoading(false));
-  }, []);
+  }
+
+  useEffect(() => { loadCheckins(); }, []);
+
+  async function deleteCheckin(id) {
+    if (!confirm('Delete this check-in? This cannot be undone.')) return;
+    await api.delete(`/checkins/${id}`);
+    setCheckins(checkins.filter(c => c.id !== id));
+  }
 
   const withCoords = checkins.filter(c => c.lat && c.lng);
 
@@ -113,7 +121,7 @@ export default function Dashboard() {
                   <p className="text-gray-400 text-xs mt-1">{c.worker_name} · {new Date(c.created_at).toLocaleDateString()}</p>
                 </div>
               </div>
-              <div className="flex gap-2 mt-3">
+              <div className="flex items-center gap-2 mt-3">
                 {[
                   { label: 'Google Maps', status: c.gbp_status }
                 ].map(({ label, status }) => (
@@ -121,6 +129,7 @@ export default function Dashboard() {
                     {label}: {status || 'pending'}
                   </span>
                 ))}
+                <button onClick={() => deleteCheckin(c.id)} className="ml-auto text-xs text-red-400 active:text-red-600">Delete</button>
               </div>
             </div>
           ))}

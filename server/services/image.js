@@ -60,4 +60,12 @@ function ensureUploadDir() {
   }
 }
 
-module.exports = { createCollage, ensureUploadDir, UPLOAD_DIR };
+async function compressImage(filePath) {
+  const compressed = await sharp(filePath)
+    .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality: 82 })
+    .toBuffer();
+  await fs.promises.writeFile(filePath, compressed);
+}
+
+module.exports = { createCollage, compressImage, ensureUploadDir, UPLOAD_DIR };

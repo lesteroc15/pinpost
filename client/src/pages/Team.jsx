@@ -61,7 +61,10 @@ export default function Team() {
           <div className="card">
             <p className="text-sm font-medium text-gray-700 mb-2">Share this link with your worker:</p>
             <div className="bg-gray-50 rounded-xl p-3 break-all text-xs text-gray-600">{inviteLink}</div>
-            <button onClick={() => { navigator.clipboard.writeText(inviteLink); }} className="text-brand-500 text-sm mt-2 font-medium">Copy link</button>
+            <div className="flex items-center justify-between mt-2">
+              <button onClick={() => { navigator.clipboard.writeText(inviteLink); }} className="text-brand-500 text-sm font-medium">Copy link</button>
+              <span className="text-xs text-gray-400">Expires in 7 days</span>
+            </div>
           </div>
         )}
 
