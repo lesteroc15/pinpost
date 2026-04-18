@@ -56,6 +56,51 @@ router.delete('/team/:userId', requireAuth, requireAdmin, async (req, res) => {
   res.json({ success: true });
 });
 
+// GBP OAuth connect (separate from login — admin must be logged in first)
+router.get('/gbp/connect', requireAuth, requireAdmin, (req, res) => {
+  const state = JSON.stringify({ orgId: req.user.orgId, userId: req.user.id });
+  const stateB64 = Buffer.from(state).toString('base64');
+  const params = new URLSearchParams({
+    client_id: process.env.GOOGLE_CLIENT_ID,
+    redirect_uri: `${process.env.APP_URL}/api/admin/gbp/callback`,
+    response_type: 'code',
+    scope: 'https://www.googleapis.com/auth/business.manage',
+    access_type: 'offline',
+    prompt: 'consent',
+    state: stateB64
+  });
+  res.redirect(`https://accounts.google.com/o/oauth2/auth?${params}`);
+});
+
+// GBP OAuth callback
+router.get('/gbp/callback', async (req, res) => {
+  const { code, error, state } = req.query;
+  if (error) return res.redirect(`${process.env.APP_URL}/settings?error=google_denied`);
+
+  try {
+    const { orgId } = JSON.parse(Buffer.from(state, 'base64').toString());
+
+    const tokenRes = await axios.post('https://oauth2.googleapis.com/token', {
+      code,
+      client_id: process.env.GOOGLE_CLIENT_ID,
+      client_secret: process.env.GOOGLE_CLIENT_SECRET,
+      redirect_uri: `${process.env.APP_URL}/api/admin/gbp/callback`,
+      grant_type: 'authorization_code'
+    });
+    const { access_token, refresh_token } = tokenRes.data;
+
+    await pool.query(
+      'UPDATE organizations SET gbp_access_token = $1, gbp_refresh_token = $2 WHERE id = $3',
+      [access_token, refresh_token, orgId]
+    );
+
+    res.redirect(`${process.env.APP_URL}/settings?success=google_connected`);
+  } catch (err) {
+    console.error('GBP OAuth error:', err.message);
+    res.redirect(`${process.env.APP_URL}/settings?error=google_failed`);
+  }
+});
+
 // Get GBP accounts (after Google OAuth)
 router.get('/gbp/accounts', requireAuth, requireAdmin, async (req, res) => {
   const orgRes = await pool.query('SELECT gbp_access_token, gbp_refresh_token FROM organizations WHERE id = $1', [req.user.orgId]);

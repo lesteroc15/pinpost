@@ -70,12 +70,12 @@ export default function Settings() {
           {org?.gbp_location_name ? (
             <div>
               <p className="text-sm text-green-600 font-medium">Connected: {org.gbp_location_name}</p>
-              <a href="/api/auth/google" className="text-brand-500 text-sm mt-1 block">Reconnect</a>
+              <a href="/api/admin/gbp/connect" className="text-brand-500 text-sm mt-1 block">Reconnect</a>
             </div>
           ) : (
             <div>
               <p className="text-sm text-gray-500 mb-3">Connect your Google Business Profile to post check-ins to Google Maps.</p>
-              <a href="/api/auth/google" className="btn-primary block text-center !py-3">Connect Google</a>
+              <a href="/api/admin/gbp/connect" className="btn-primary block text-center !py-3">Connect Google</a>
 
               {accounts.length > 0 && (
                 <div className="mt-3 space-y-2">
