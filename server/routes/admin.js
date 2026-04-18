@@ -57,8 +57,15 @@ router.delete('/team/:userId', requireAuth, requireAdmin, async (req, res) => {
 });
 
 // GBP OAuth connect (separate from login — admin must be logged in first)
-router.get('/gbp/connect', requireAuth, requireAdmin, (req, res) => {
-  const state = JSON.stringify({ orgId: req.user.orgId, userId: req.user.id });
+// Accepts token via query param since browser navigation doesn't send Auth header
+router.get('/gbp/connect', (req, res) => {
+  const jwt = require('jsonwebtoken');
+  const token = req.query.token;
+  if (!token) return res.status(401).json({ error: 'Token required' });
+  let user;
+  try { user = jwt.verify(token, process.env.JWT_SECRET); } catch { return res.status(401).json({ error: 'Invalid token' }); }
+  if (user.role !== 'admin' && user.role !== 'super_admin') return res.status(403).json({ error: 'Admin only' });
+  const state = JSON.stringify({ orgId: user.orgId, userId: user.id });
   const stateB64 = Buffer.from(state).toString('base64');
   const params = new URLSearchParams({
     client_id: process.env.GOOGLE_CLIENT_ID,

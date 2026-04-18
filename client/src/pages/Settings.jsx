@@ -53,13 +53,13 @@ export default function Settings() {
       </div>
 
       <div className="p-4 space-y-4">
-        {success === 'meta_connected' && (
-          <div className="p-3 bg-green-50 text-green-600 rounded-xl text-sm">Facebook/Instagram connected!</div>
+        {success === 'google_connected' && (
+          <div className="p-3 bg-green-50 text-green-600 rounded-xl text-sm">Google Business Profile connected!</div>
         )}
         {error && (
           <div className="p-3 bg-red-50 text-red-600 rounded-xl text-sm">
-            {error === 'no_pages' ? 'No Facebook Pages found. Create one first.' :
-             error === 'meta_denied' ? 'Facebook/Instagram connection cancelled.' :
+            {error === 'google_denied' ? 'Google connection cancelled.' :
+             error === 'google_failed' ? 'Google connection failed. Please try again.' :
              'Connection failed. Please try again.'}
           </div>
         )}
@@ -70,12 +70,12 @@ export default function Settings() {
           {org?.gbp_location_name ? (
             <div>
               <p className="text-sm text-green-600 font-medium">Connected: {org.gbp_location_name}</p>
-              <a href="/api/admin/gbp/connect" className="text-brand-500 text-sm mt-1 block">Reconnect</a>
+              <a href={`/api/admin/gbp/connect?token=${localStorage.getItem('token')}`} className="text-brand-500 text-sm mt-1 block">Reconnect</a>
             </div>
           ) : (
             <div>
               <p className="text-sm text-gray-500 mb-3">Connect your Google Business Profile to post check-ins to Google Maps.</p>
-              <a href="/api/admin/gbp/connect" className="btn-primary block text-center !py-3">Connect Google</a>
+              <a href={`/api/admin/gbp/connect?token=${localStorage.getItem('token')}`} className="btn-primary block text-center !py-3">Connect Google</a>
 
               {accounts.length > 0 && (
                 <div className="mt-3 space-y-2">
