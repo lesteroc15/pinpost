@@ -11,6 +11,18 @@ async function refreshAccessToken(refreshToken) {
 }
 
 async function listAccounts(accessToken) {
+  // Try the legacy v4 API first (often has better quota for new projects)
+  try {
+    const res = await axios.get(
+      'https://mybusiness.googleapis.com/v4/accounts',
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    console.log('GBP: v4 accounts response:', JSON.stringify(res.data).slice(0, 300));
+    return res.data.accounts || [];
+  } catch (v4err) {
+    console.log('GBP: v4 failed, trying v1:', v4err.response?.data?.error?.message || v4err.message);
+  }
+  // Fallback to v1 API
   const res = await axios.get(
     'https://mybusinessaccountmanagement.googleapis.com/v1/accounts',
     { headers: { Authorization: `Bearer ${accessToken}` } }
