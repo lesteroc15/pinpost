@@ -1,9 +1,11 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../api';
 
 export default function CheckIn() {
   const [address, setAddress] = useState('');
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [lat, setLat] = useState(null);
   const [lng, setLng] = useState(null);
   const [description, setDescription] = useState('');
@@ -16,8 +18,34 @@ export default function CheckIn() {
   const [aiLoading, setAiLoading] = useState(false);
   const [error, setError] = useState('');
   const fileInput = useRef();
+  const debounceTimer = useRef(null);
   const navigate = useNavigate();
   const role = localStorage.getItem('role');
+
+  // Address autocomplete via Nominatim
+  function onAddressChange(val) {
+    setAddress(val);
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    if (val.length < 3) { setSuggestions([]); setShowSuggestions(false); return; }
+    debounceTimer.current = setTimeout(async () => {
+      try {
+        const r = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(val)}&format=json&limit=5&countrycodes=us&addressdetails=1`
+        );
+        const data = await r.json();
+        setSuggestions(data);
+        setShowSuggestions(data.length > 0);
+      } catch { setSuggestions([]); }
+    }, 400);
+  }
+
+  function selectSuggestion(s) {
+    setAddress(s.display_name);
+    setLat(parseFloat(s.lat));
+    setLng(parseFloat(s.lon));
+    setShowSuggestions(false);
+    setSuggestions([]);
+  }
 
   async function getGPS() {
     setGpsLoading(true);
@@ -119,14 +147,33 @@ export default function CheckIn() {
         <div className="card space-y-3">
           <label className="text-sm font-semibold text-gray-700">Job Address *</label>
           <div className="flex gap-2">
-            <input
-              className="input-field flex-1"
-              type="text"
-              placeholder="123 Main St, City, State"
-              value={address}
-              onChange={e => setAddress(e.target.value)}
-              required
-            />
+            <div className="relative flex-1">
+              <input
+                className="input-field w-full"
+                type="text"
+                placeholder="Start typing an address..."
+                value={address}
+                onChange={e => onAddressChange(e.target.value)}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+                required
+                autoComplete="off"
+              />
+              {showSuggestions && (
+                <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-lg z-50 mt-1 max-h-60 overflow-y-auto">
+                  {suggestions.map((s, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-brand-50 active:bg-brand-100 border-b border-gray-50 last:border-0"
+                      onMouseDown={() => selectSuggestion(s)}
+                    >
+                      {s.display_name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <button
               type="button"
               onClick={getGPS}
