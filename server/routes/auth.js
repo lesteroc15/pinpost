@@ -114,7 +114,7 @@ router.get('/me', requireAuth, async (req, res) => {
   let org = null;
   if (user.org_id) {
     const orgRes = await pool.query(
-      'SELECT id, name, status, gbp_location_name, gbp_location_id, meta_page_id, meta_ig_account_id FROM organizations WHERE id = $1',
+      'SELECT id, name, status, gbp_location_name, gbp_location_id, meta_page_id, meta_ig_account_id, (gbp_refresh_token IS NOT NULL) as gbp_connected FROM organizations WHERE id = $1',
       [user.org_id]
     );
     org = orgRes.rows[0] || null;
