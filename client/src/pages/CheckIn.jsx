@@ -47,7 +47,7 @@ export default function CheckIn() {
     setAiLoading(true);
     setError('');
     try {
-      const { data } = await api.post('/checkins/generate-description', { address });
+      const { data } = await api.post('/checkins/generate-description', { address, existingText: description });
       setDescription(data.description);
     } catch {
       setError('Could not generate description. Try again.');

@@ -28,10 +28,10 @@ const upload = multer({
 
 // Generate AI description
 router.post('/generate-description', requireAuth, async (req, res) => {
-  const { address, businessName, businessType } = req.body;
+  const { address, businessName, businessType, existingText } = req.body;
   if (!address) return res.status(400).json({ error: 'Address required' });
   try {
-    const description = await generateDescription({ businessName, businessType, address });
+    const description = await generateDescription({ businessName, businessType, address, existingText });
     res.json({ description });
   } catch (err) {
     console.error('Claude error:', err.message);
