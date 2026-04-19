@@ -1,6 +1,7 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../api';
+import { Icon } from '../components/Icons';
 
 export default function CheckIn() {
   const [address, setAddress] = useState('');
@@ -9,20 +10,18 @@ export default function CheckIn() {
   const [lat, setLat] = useState(null);
   const [lng, setLng] = useState(null);
   const [description, setDescription] = useState('');
-  const [useSocialDescription, setUseSocialDescription] = useState(false);
-  const [socialDescription, setSocialDescription] = useState('');
   const [photos, setPhotos] = useState([]);
   const [previews, setPreviews] = useState([]);
   const [loading, setLoading] = useState(false);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showPreview, setShowPreview] = useState(false);
   const fileInput = useRef();
   const debounceTimer = useRef(null);
   const navigate = useNavigate();
   const role = localStorage.getItem('role');
 
-  // Address autocomplete via Nominatim
   function onAddressChange(val) {
     setAddress(val);
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
@@ -56,8 +55,6 @@ export default function CheckIn() {
       const { latitude, longitude } = pos.coords;
       setLat(latitude);
       setLng(longitude);
-
-      // Reverse geocode using OpenStreetMap Nominatim
       const r = await fetch(
         `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
       );
@@ -99,9 +96,14 @@ export default function CheckIn() {
     setPreviews(newPreviews);
   }
 
-  async function handleSubmit(e) {
+  function handleReview(e) {
     e.preventDefault();
     if (!address || !description) return setError('Address and description are required');
+    setError('');
+    setShowPreview(true);
+  }
+
+  async function handleSubmit() {
     setLoading(true);
     setError('');
 
@@ -110,175 +112,272 @@ export default function CheckIn() {
     form.append('description', description);
     if (lat) form.append('lat', lat);
     if (lng) form.append('lng', lng);
-    if (useSocialDescription && socialDescription) form.append('socialDescription', socialDescription);
     photos.forEach(p => form.append('photos', p));
 
     try {
       const { data } = await api.post('/checkins', form, { headers: { 'Content-Type': 'multipart/form-data' } });
       navigate(`/success?id=${data.checkinId}`);
     } catch (err) {
+      setShowPreview(false);
       setError(err.response?.data?.error || 'Failed to submit. Please try again.');
     } finally {
       setLoading(false);
     }
   }
 
+  function signOut() {
+    localStorage.removeItem('token');
+    localStorage.removeItem('role');
+    window.location.href = '/login';
+  }
+
   return (
-    <div className="min-h-screen pb-8">
-      {/* Header */}
-      <div className="bg-brand-500 text-white px-4 pt-12 pb-6">
+    <div className="app-shell pb-8">
+      <header className="topbar">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">New Check-in</h1>
-            <p className="text-brand-100 text-sm mt-0.5">Post to Google Maps & social</p>
+          <div className="flex items-center gap-3">
+            <Icon.PinMark className="w-7 h-7 text-white/90" />
+            <div>
+              <h1 className="topbar-title">New Check-in</h1>
+              <p className="topbar-sub">Posts to your Google Business Profile</p>
+            </div>
           </div>
-          {role === 'admin' && (
-            <Link to="/dashboard" className="text-brand-100 text-sm underline">Dashboard</Link>
+          {(role === 'admin' || role === 'super_admin') && (
+            <Link to="/dashboard" className="text-white/80 hover:text-white text-sm font-medium flex items-center gap-1">
+              <Icon.LayoutList className="w-4 h-4" />
+              Dashboard
+            </Link>
           )}
         </div>
-      </div>
+      </header>
 
-      <form onSubmit={handleSubmit} className="p-4 space-y-4">
+      <form onSubmit={handleReview} className="p-4 space-y-4">
         {error && (
-          <div className="p-3 bg-red-50 text-red-600 rounded-xl text-sm">{error}</div>
+          <div className="banner banner-error">
+            <Icon.AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+            <span>{error}</span>
+          </div>
         )}
 
         {/* Address */}
-        <div className="card space-y-3">
-          <label className="text-sm font-semibold text-gray-700">Job Address *</label>
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <input
-                className="input-field w-full"
-                type="text"
-                placeholder="Start typing an address..."
-                value={address}
-                onChange={e => onAddressChange(e.target.value)}
-                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
-                required
-                autoComplete="off"
-              />
-              {showSuggestions && (
-                <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-lg z-50 mt-1 max-h-60 overflow-y-auto">
-                  {suggestions.map((s, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-brand-50 active:bg-brand-100 border-b border-gray-50 last:border-0"
-                      onMouseDown={() => selectSuggestion(s)}
-                    >
-                      {s.display_name}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={getGPS}
-              disabled={gpsLoading}
-              className="flex-shrink-0 bg-brand-50 text-brand-600 border border-brand-200 rounded-2xl px-3 py-3 text-xl active:bg-brand-100"
-              title="Use GPS"
-            >
-              {gpsLoading ? '⏳' : '📍'}
-            </button>
+        <section className="card">
+          <div className="card-hd">
+            <span className="label !mb-0">Job Address</span>
+            <span className="text-xs text-ink-400">Required</span>
           </div>
-        </div>
+          <div className="card-bd">
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <input
+                  className="input-field"
+                  type="text"
+                  placeholder="Start typing an address…"
+                  value={address}
+                  onChange={e => onAddressChange(e.target.value)}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                  onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+                  required
+                  autoComplete="off"
+                />
+                {showSuggestions && (
+                  <div className="absolute top-full left-0 right-0 bg-white border border-ink-200 rounded-xl shadow-card-lg z-50 mt-1 max-h-60 overflow-y-auto">
+                    {suggestions.map((s, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        className="w-full text-left px-4 py-3 text-sm text-ink-700 hover:bg-brand-50 active:bg-brand-100 border-b border-ink-50 last:border-0"
+                        onMouseDown={() => selectSuggestion(s)}
+                      >
+                        {s.display_name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={getGPS}
+                disabled={gpsLoading}
+                className="flex-shrink-0 bg-brand-50 text-brand-700 border border-brand-100 rounded-xl w-12 h-12 flex items-center justify-center active:bg-brand-100 disabled:opacity-50"
+                aria-label="Use current location"
+                title="Use current location"
+              >
+                {gpsLoading
+                  ? <Icon.Loader className="w-5 h-5 animate-spin" />
+                  : <Icon.Navigation className="w-5 h-5" />}
+              </button>
+            </div>
+            {(lat && lng) && (
+              <p className="text-xs text-ink-400 mt-2 flex items-center gap-1">
+                <Icon.MapPin className="w-3.5 h-3.5" />
+                {lat.toFixed(5)}, {lng.toFixed(5)}
+              </p>
+            )}
+          </div>
+        </section>
 
         {/* Description */}
-        <div className="card space-y-3">
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-semibold text-gray-700">Job Description *</label>
+        <section className="card">
+          <div className="card-hd">
+            <span className="label !mb-0">Job Description</span>
             <button
               type="button"
               onClick={generateAI}
               disabled={aiLoading}
-              className="text-xs bg-brand-50 text-brand-600 px-3 py-1.5 rounded-xl font-medium active:bg-brand-100 disabled:opacity-50"
+              className="btn-chip-brand"
             >
-              {aiLoading ? 'Generating...' : '✨ Generate with AI'}
+              {aiLoading
+                ? <><Icon.Loader className="w-3.5 h-3.5 animate-spin" /> Generating…</>
+                : <><Icon.Sparkles className="w-3.5 h-3.5" /> AI draft</>}
             </button>
           </div>
-          <textarea
-            className="input-field resize-none"
-            rows={4}
-            placeholder="Describe the work you completed in detail..."
-            value={description}
-            onChange={e => setDescription(e.target.value)}
-            required
-          />
-
-          {/* Social media alternative — hidden until Meta integration is live */}
-        </div>
+          <div className="card-bd">
+            <textarea
+              className="input-field resize-none"
+              rows={4}
+              placeholder="Describe the work you completed: what the problem was, what you did, parts used, outcome…"
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              required
+            />
+            <p className="text-xs text-ink-400 mt-2">Tip: specifics like the neighborhood and the fix help your Google ranking.</p>
+          </div>
+        </section>
 
         {/* Photos */}
-        <div className="card space-y-3">
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-semibold text-gray-700">
-              Photos <span className="text-gray-400 font-normal">(up to 10)</span>
-            </label>
+        <section className="card">
+          <div className="card-hd">
+            <span className="label !mb-0">Photos <span className="text-ink-400 normal-case tracking-normal font-normal">· up to 10</span></span>
             {photos.length >= 2 && (
-              <span className="text-xs text-brand-600 bg-brand-50 px-2 py-1 rounded-lg">Before/After collage ready</span>
+              <span className="pill pill-warn">
+                <Icon.Sparkles className="w-3 h-3" />
+                Before / After
+              </span>
             )}
           </div>
+          <div className="card-bd space-y-3">
+            {previews.length > 0 && (
+              <div className="grid grid-cols-3 gap-2">
+                {previews.map((src, i) => (
+                  <div key={i} className="relative aspect-square">
+                    <img src={src} className="w-full h-full object-cover rounded-xl" />
+                    <button
+                      type="button"
+                      onClick={() => removePhoto(i)}
+                      className="absolute top-1.5 right-1.5 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center active:bg-black/80"
+                      aria-label="Remove photo"
+                    >
+                      <Icon.X className="w-3.5 h-3.5" />
+                    </button>
+                    {i === 0 && photos.length >= 2 && (
+                      <span className="absolute bottom-1.5 left-1.5 bg-black/65 text-white text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded">Before</span>
+                    )}
+                    {i === 1 && (
+                      <span className="absolute bottom-1.5 left-1.5 bg-accent-500 text-white text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded">After</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
 
-          {previews.length > 0 && (
-            <div className="grid grid-cols-3 gap-2">
-              {previews.map((src, i) => (
-                <div key={i} className="relative aspect-square">
-                  <img src={src} className="w-full h-full object-cover rounded-xl" />
-                  <button
-                    type="button"
-                    onClick={() => removePhoto(i)}
-                    className="absolute top-1 right-1 bg-black/60 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs"
-                  >
-                    ✕
-                  </button>
-                  {i === 0 && photos.length >= 2 && (
-                    <span className="absolute bottom-1 left-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded">Before</span>
-                  )}
-                  {i === 1 && (
-                    <span className="absolute bottom-1 left-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded">After</span>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {photos.length < 10 && (
-            <button
-              type="button"
-              onClick={() => fileInput.current.click()}
-              className="w-full border-2 border-dashed border-gray-200 rounded-2xl py-6 text-center text-gray-400 active:border-brand-300 active:text-brand-500"
-            >
-              <div className="text-3xl mb-1">📷</div>
-              <div className="text-sm font-medium">Add Photo</div>
-              <div className="text-xs mt-0.5">Select or take a photo</div>
-            </button>
-          )}
-          <input
-            ref={fileInput}
-            type="file"
-            accept="image/*"
-            multiple
-            capture="environment"
-            onChange={handlePhotos}
-            className="hidden"
-          />
-        </div>
+            {photos.length < 10 && (
+              <button
+                type="button"
+                onClick={() => fileInput.current.click()}
+                className="upload-zone"
+              >
+                <Icon.Camera className="w-7 h-7 mx-auto mb-2 text-ink-400" />
+                <div className="text-sm font-semibold text-ink-700">Add Photo</div>
+                <div className="text-xs text-ink-400 mt-0.5">Take a new shot or pick from your library</div>
+              </button>
+            )}
+            <input
+              ref={fileInput}
+              type="file"
+              accept="image/*"
+              multiple
+              capture="environment"
+              onChange={handlePhotos}
+              className="hidden"
+            />
+          </div>
+        </section>
 
         <button className="btn-primary" type="submit" disabled={loading}>
-          {loading ? 'Posting...' : '📤 Post Check-in'}
+          {loading
+            ? (<><Icon.Loader className="w-5 h-5 animate-spin" /> Posting…</>)
+            : (<><Icon.Send className="w-5 h-5" /> Post Check-in</>)}
         </button>
 
-        <button
-          type="button"
-          onClick={() => { localStorage.removeItem('token'); localStorage.removeItem('role'); window.location.href = '/login'; }}
-          className="w-full text-center text-gray-400 text-sm py-2"
-        >
+        <button type="button" onClick={signOut} className="w-full text-center text-ink-400 hover:text-ink-600 text-sm py-2 flex items-center justify-center gap-1.5">
+          <Icon.LogOut className="w-4 h-4" />
           Sign out
         </button>
       </form>
+
+      {/* Post Preview — the "gotcha moment" */}
+      {showPreview && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4" onClick={() => setShowPreview(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-card-lg" onClick={e => e.stopPropagation()}>
+            <div className="px-5 pt-5 pb-3">
+              <p className="label">Preview — Google Business Profile Post</p>
+            </div>
+
+            {/* Simulated GBP post card */}
+            <div className="mx-5 rounded-xl border border-ink-200 overflow-hidden mb-4">
+              {/* Business header */}
+              <div className="flex items-center gap-3 p-3 border-b border-ink-100">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white font-bold text-sm">
+                  P
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-ink-900">Your Business Name</p>
+                  <p className="text-xs text-ink-400">Just now</p>
+                </div>
+                <div className="flex items-center gap-0.5">
+                  {[1,2,3,4,5].map(i => (
+                    <svg key={i} className="w-3 h-3 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+                  ))}
+                </div>
+              </div>
+
+              {/* Photo */}
+              {previews.length > 0 && (
+                <img src={previews[0]} className="w-full aspect-video object-cover" alt="" />
+              )}
+
+              {/* Post text */}
+              <div className="p-3">
+                <p className="text-sm text-ink-800 leading-relaxed">{description}</p>
+                <p className="text-xs text-ink-400 mt-2 flex items-center gap-1">
+                  <Icon.MapPin className="w-3 h-3" />
+                  {address}
+                </p>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="px-5 pb-5 space-y-2">
+              <button
+                onClick={handleSubmit}
+                disabled={loading}
+                className="btn-primary"
+              >
+                {loading
+                  ? (<><Icon.Loader className="w-5 h-5 animate-spin" /> Posting...</>)
+                  : (<><Icon.Send className="w-5 h-5" /> Post to Google Maps</>)}
+              </button>
+              <button
+                onClick={() => setShowPreview(false)}
+                disabled={loading}
+                className="btn-secondary"
+              >
+                Edit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

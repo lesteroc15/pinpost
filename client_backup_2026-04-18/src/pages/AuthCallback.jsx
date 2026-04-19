@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Icon } from '../components/Icons';
 
 export default function AuthCallback() {
   const [params] = useSearchParams();
@@ -21,16 +20,8 @@ export default function AuthCallback() {
   }, []);
 
   return (
-    <div className="app-shell flex items-center justify-center">
-      <div className="flex flex-col items-center gap-3">
-        <div className="brand-mark opacity-80">
-          <Icon.PinMark className="w-7 h-7 text-white" />
-        </div>
-        <div className="flex items-center gap-2 text-ink-500 text-sm">
-          <Icon.Loader className="w-4 h-4 animate-spin" />
-          Signing you in…
-        </div>
-      </div>
+    <div className="min-h-screen flex items-center justify-center">
+      <p className="text-gray-500">Signing you in...</p>
     </div>
   );
 }

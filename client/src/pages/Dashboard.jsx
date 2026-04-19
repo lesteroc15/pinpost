@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import api from '../api';
+import { Icon } from '../components/Icons';
 
-// Fix leaflet default icon
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
@@ -12,11 +12,11 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png'
 });
 
-const STATUS_COLORS = {
-  posted: 'text-green-600 bg-green-50',
-  failed: 'text-red-600 bg-red-50',
-  pending: 'text-yellow-600 bg-yellow-50',
-  skipped: 'text-gray-400 bg-gray-50'
+const STATUS = {
+  posted:  { cls: 'pill-success', label: 'Posted' },
+  failed:  { cls: 'pill-danger',  label: 'Failed' },
+  pending: { cls: 'pill-warn',    label: 'Pending' },
+  skipped: { cls: 'pill-neutral', label: 'Skipped' }
 };
 
 export default function Dashboard() {
@@ -24,11 +24,11 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState('list');
 
-  function loadCheckins() {
+  function load() {
     api.get('/checkins').then(r => { setCheckins(r.data); setLoading(false); }).catch(() => setLoading(false));
   }
 
-  useEffect(() => { loadCheckins(); }, []);
+  useEffect(() => { load(); }, []);
 
   async function deleteCheckin(id) {
     if (!confirm('Delete this check-in? This cannot be undone.')) return;
@@ -37,48 +37,69 @@ export default function Dashboard() {
   }
 
   const withCoords = checkins.filter(c => c.lat && c.lng);
+  const postedCount = checkins.filter(c => c.gbp_status === 'posted').length;
+  const locationsCount = new Set(checkins.map(c => c.address)).size;
 
   return (
-    <div className="min-h-screen pb-8">
-      <div className="bg-brand-500 text-white px-4 pt-12 pb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold">Dashboard</h1>
-          <Link to="/checkin" className="bg-white/20 text-white px-3 py-1.5 rounded-xl text-sm font-medium">
-            + Check-in
+    <div className="app-shell-wide pb-8">
+      <header className="topbar">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <Icon.PinMark className="w-7 h-7 text-white/90" />
+            <div>
+              <h1 className="topbar-title">Dashboard</h1>
+              <p className="topbar-sub">All check-ins from your team</p>
+            </div>
+          </div>
+          <Link to="/checkin" className="btn btn-md bg-white text-brand-700 hover:bg-brand-50 font-semibold">
+            <Icon.Plus className="w-4 h-4" />
+            Check-in
           </Link>
         </div>
         <div className="flex gap-3">
-          <div className="bg-white/10 rounded-xl px-4 py-2 text-center flex-1">
-            <div className="text-2xl font-bold">{checkins.length}</div>
-            <div className="text-brand-100 text-xs">Total</div>
+          <div className="stat-tile">
+            <div className="stat-val">{checkins.length}</div>
+            <div className="stat-lbl">Check-ins</div>
           </div>
-          <div className="bg-white/10 rounded-xl px-4 py-2 text-center flex-1">
-            <div className="text-2xl font-bold">{checkins.filter(c => c.gbp_status === 'posted').length}</div>
-            <div className="text-brand-100 text-xs">On Google</div>
+          <div className="stat-tile">
+            <div className="stat-val">{postedCount}</div>
+            <div className="stat-lbl">On Google</div>
           </div>
-          <div className="bg-white/10 rounded-xl px-4 py-2 text-center flex-1">
-            <div className="text-2xl font-bold">{new Set(checkins.map(c => c.address)).size}</div>
-            <div className="text-brand-100 text-xs">Locations</div>
+          <div className="stat-tile">
+            <div className="stat-val">{locationsCount}</div>
+            <div className="stat-lbl">Locations</div>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Nav */}
-      <div className="flex border-b border-gray-100 bg-white">
-        {['list', 'map'].map(v => (
-          <button key={v} onClick={() => setView(v)}
-            className={`flex-1 py-3 text-sm font-medium capitalize transition-colors ${view === v ? 'text-brand-600 border-b-2 border-brand-500' : 'text-gray-400'}`}>
-            {v === 'list' ? '📋 List' : '🗺️ Map'}
-          </button>
-        ))}
-        <Link to="/team" className="flex-1 py-3 text-sm font-medium text-gray-400 text-center">👥 Team</Link>
-        <Link to="/settings" className="flex-1 py-3 text-sm font-medium text-gray-400 text-center">⚙️ Settings</Link>
-      </div>
+      <nav className="tabs">
+        <button onClick={() => setView('list')}
+          className={`tab ${view === 'list' ? 'tab-active' : ''}`}>
+          <Icon.LayoutList className="w-4 h-4" />
+          List
+        </button>
+        <button onClick={() => setView('map')}
+          className={`tab ${view === 'map' ? 'tab-active' : ''}`}>
+          <Icon.Map className="w-4 h-4" />
+          Map
+        </button>
+        <Link to="/team" className="tab">
+          <Icon.Users className="w-4 h-4" />
+          Team
+        </Link>
+        <Link to="/settings" className="tab">
+          <Icon.Settings className="w-4 h-4" />
+          Settings
+        </Link>
+      </nav>
 
       {loading ? (
-        <div className="p-8 text-center text-gray-400">Loading...</div>
+        <div className="p-10 text-center text-ink-400 flex items-center justify-center gap-2">
+          <Icon.Loader className="w-4 h-4 animate-spin" />
+          Loading…
+        </div>
       ) : view === 'map' ? (
-        <div className="h-96">
+        <div className="h-[28rem] md:h-[32rem]">
           {withCoords.length > 0 ? (
             <MapContainer center={[withCoords[0].lat, withCoords[0].lng]} zoom={12} style={{ height: '100%', width: '100%' }}>
               <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
@@ -87,54 +108,78 @@ export default function Dashboard() {
                   <Popup>
                     <div className="text-xs">
                       <p className="font-semibold">{c.address}</p>
-                      <p className="text-gray-500">{c.worker_name}</p>
-                      <p className="text-gray-400">{new Date(c.created_at).toLocaleDateString()}</p>
+                      <p className="text-ink-500">{c.worker_name}</p>
+                      <p className="text-ink-400">{new Date(c.created_at).toLocaleDateString()}</p>
                     </div>
                   </Popup>
                 </Marker>
               ))}
             </MapContainer>
           ) : (
-            <div className="p-8 text-center text-gray-400">No check-ins with GPS data yet</div>
+            <EmptyState
+              icon={<Icon.Map className="w-10 h-10 text-ink-300" />}
+              title="No GPS data yet"
+              body="Check-ins with location will appear here."
+            />
           )}
         </div>
       ) : (
-        <div className="p-4 space-y-3">
+        <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
           {checkins.length === 0 ? (
-            <div className="text-center py-12 text-gray-400">
-              <div className="text-4xl mb-3">📍</div>
-              <p>No check-ins yet.</p>
-              <Link to="/checkin" className="text-brand-500 text-sm mt-2 block">Create your first check-in</Link>
+            <div className="md:col-span-2">
+              <EmptyState
+                icon={<Icon.MapPin className="w-10 h-10 text-ink-300" />}
+                title="No check-ins yet"
+                body="Your team's first check-in will show up here."
+                action={<Link to="/checkin" className="btn-ghost"><Icon.Plus className="w-4 h-4" />Create one</Link>}
+              />
             </div>
-          ) : checkins.map(c => (
-            <div key={c.id} className="card">
-              <div className="flex gap-3">
-                {(c.collage_path || c.photo_paths?.[0]) && (
-                  <img
-                    src={`/uploads/${c.collage_path || c.photo_paths[0]}`}
-                    className="w-16 h-16 rounded-xl object-cover flex-shrink-0"
-                  />
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-gray-900 text-sm truncate">{c.address}</p>
-                  <p className="text-gray-500 text-xs mt-0.5 line-clamp-2">{c.description}</p>
-                  <p className="text-gray-400 text-xs mt-1">{c.worker_name} · {new Date(c.created_at).toLocaleDateString()}</p>
+          ) : checkins.map(c => {
+            const s = STATUS[c.gbp_status] || STATUS.pending;
+            return (
+              <article key={c.id} className="card card-pad">
+                <div className="flex gap-3">
+                  {(c.collage_path || c.photo_paths?.[0]) && (
+                    <img
+                      src={`/uploads/${c.collage_path || c.photo_paths[0]}`}
+                      className="w-16 h-16 rounded-xl object-cover flex-shrink-0 bg-ink-100"
+                      alt=""
+                    />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-ink-900 text-sm truncate">{c.address}</p>
+                    <p className="text-ink-600 text-xs mt-0.5 line-clamp-2">{c.description}</p>
+                    <p className="text-ink-400 text-xs mt-1">{c.worker_name} · {new Date(c.created_at).toLocaleDateString()}</p>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-2 mt-3">
-                {[
-                  { label: 'Google Maps', status: c.gbp_status }
-                ].map(({ label, status }) => (
-                  <span key={label} className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[status] || STATUS_COLORS.pending}`}>
-                    {label}: {status || 'pending'}
+                <div className="flex items-center gap-2 mt-3">
+                  <span className={`pill ${s.cls}`}>
+                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6" /></svg>
+                    Google {s.label}
                   </span>
-                ))}
-                <button onClick={() => deleteCheckin(c.id)} className="ml-auto text-xs text-red-400 active:text-red-600">Delete</button>
-              </div>
-            </div>
-          ))}
+                  <button onClick={() => deleteCheckin(c.id)} className="ml-auto text-xs text-ink-400 hover:text-red-600 flex items-center gap-1">
+                    <Icon.Trash className="w-3.5 h-3.5" />
+                    Delete
+                  </button>
+                </div>
+              </article>
+            );
+          })}
         </div>
       )}
+    </div>
+  );
+}
+
+function EmptyState({ icon, title, body, action }) {
+  return (
+    <div className="text-center py-14 px-6">
+      <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-ink-50 mb-4">
+        {icon}
+      </div>
+      <h3 className="h2">{title}</h3>
+      <p className="meta mt-1">{body}</p>
+      {action && <div className="mt-4 flex justify-center">{action}</div>}
     </div>
   );
 }
