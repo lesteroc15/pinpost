@@ -4,8 +4,26 @@ const jwt = require('jsonwebtoken');
 const axios = require('axios');
 const { pool } = require('../db');
 const { requireAuth } = require('../middleware/auth');
+const { rateLimit, ipKey } = require('../middleware/rateLimit');
 
 const router = express.Router();
+
+const MIN_PASSWORD = 6;
+
+// 10 attempts per IP per 15 minutes is generous for a typo-prone user but stops a brute-force.
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  key: ipKey,
+  message: 'Too many login attempts. Please wait a few minutes and try again.'
+});
+
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  key: ipKey,
+  message: 'Too many registration attempts. Please try again later.'
+});
 
 function makeToken(user) {
   return jwt.sign(
@@ -16,7 +34,7 @@ function makeToken(user) {
 }
 
 // Email/password login (workers, super admin)
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
 
@@ -123,9 +141,12 @@ router.get('/me', requireAuth, async (req, res) => {
 });
 
 // Register via invite token
-router.post('/register', async (req, res) => {
-  const { token, name, password } = req.body;
+router.post('/register', registerLimiter, async (req, res) => {
+  const { token, name, password, email: bodyEmail } = req.body;
   if (!token || !name || !password) return res.status(400).json({ error: 'All fields required' });
+  if (password.length < MIN_PASSWORD) {
+    return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD} characters.` });
+  }
 
   const inviteRes = await pool.query(
     'SELECT * FROM invites WHERE token = $1 AND used = false AND expires_at > NOW()',
@@ -134,17 +155,30 @@ router.post('/register', async (req, res) => {
   const invite = inviteRes.rows[0];
   if (!invite) return res.status(400).json({ error: 'Invalid or expired invite link' });
 
-  const hash = await bcrypt.hash(password, 10);
-  const email = invite.email || `worker_${Date.now()}@pinpost.app`;
+  // The invite either pins an email (set by the admin) or asks the worker for one.
+  // We never auto-generate fake emails — workers need a real email to recover their account.
+  const submittedEmail = bodyEmail ? String(bodyEmail).trim().toLowerCase() : null;
+  const email = invite.email || submittedEmail;
+  if (!email) return res.status(400).json({ error: 'Email is required.' });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Please enter a valid email.' });
 
-  const { rows } = await pool.query(
-    'INSERT INTO users (org_id, email, password_hash, name, role) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-    [invite.org_id, email, hash, name, 'worker']
-  );
+  const hash = await bcrypt.hash(password, 10);
+
+  let user;
+  try {
+    const { rows } = await pool.query(
+      'INSERT INTO users (org_id, email, password_hash, name, role) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [invite.org_id, email, hash, name, 'worker']
+    );
+    user = rows[0];
+  } catch (err) {
+    if (err.code === '23505') return res.status(400).json({ error: 'An account with that email already exists.' });
+    throw err;
+  }
 
   await pool.query('UPDATE invites SET used = true WHERE id = $1', [invite.id]);
 
-  res.json({ token: makeToken(rows[0]), role: 'worker' });
+  res.json({ token: makeToken(user), role: 'worker' });
 });
 
 module.exports = router;

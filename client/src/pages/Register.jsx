@@ -5,6 +5,7 @@ import { Icon } from '../components/Icons';
 
 export default function Register() {
   const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -29,7 +30,7 @@ export default function Register() {
     setLoading(true);
     setError('');
     try {
-      const { data } = await api.post('/auth/register', { token, name, password });
+      const { data } = await api.post('/auth/register', { token, name, email, password });
       localStorage.setItem('token', data.token);
       localStorage.setItem('role', data.role);
       navigate('/checkin');
@@ -68,6 +69,19 @@ export default function Register() {
             onChange={e => setName(e.target.value)}
             required
           />
+        </div>
+        <div>
+          <label className="label">Email</label>
+          <input
+            className="input-field"
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            autoComplete="email"
+            required
+          />
+          <p className="text-xs text-ink-400 mt-1">If your admin already entered an email when sending this invite, that one will be used instead.</p>
         </div>
         <div>
           <label className="label">Create a password</label>

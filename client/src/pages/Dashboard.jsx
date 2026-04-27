@@ -36,6 +36,18 @@ export default function Dashboard() {
     setCheckins(checkins.filter(c => c.id !== id));
   }
 
+  async function retryCheckin(id) {
+    setCheckins(prev => prev.map(c => c.id === id ? { ...c, gbp_status: 'pending', gbp_error: null } : c));
+    try {
+      await api.post(`/checkins/${id}/retry`);
+      setTimeout(load, 4000); // give GBP a few seconds, then refresh
+    } catch (err) {
+      const msg = err.response?.data?.error || 'Retry failed.';
+      alert(msg);
+      load();
+    }
+  }
+
   const withCoords = checkins.filter(c => c.lat && c.lng);
   const postedCount = checkins.filter(c => c.gbp_status === 'posted').length;
   const locationsCount = new Set(checkins.map(c => c.address)).size;
@@ -152,16 +164,28 @@ export default function Dashboard() {
                     <p className="text-ink-400 text-xs mt-1">{c.worker_name} · {new Date(c.created_at).toLocaleDateString()}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 mt-3">
-                  <span className={`pill ${s.cls}`}>
+                <div className="flex items-center gap-2 mt-3 flex-wrap">
+                  <span className={`pill ${s.cls}`} title={c.gbp_error || ''}>
                     <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6" /></svg>
                     Google {s.label}
                   </span>
+                  {(c.gbp_status === 'failed' || c.gbp_status === 'skipped') && (
+                    <button
+                      onClick={() => retryCheckin(c.id)}
+                      className="text-xs font-semibold text-brand-700 hover:text-brand-800 flex items-center gap-1"
+                    >
+                      <Icon.Loader className="w-3.5 h-3.5" />
+                      Retry
+                    </button>
+                  )}
                   <button onClick={() => deleteCheckin(c.id)} className="ml-auto text-xs text-ink-400 hover:text-red-600 flex items-center gap-1">
                     <Icon.Trash className="w-3.5 h-3.5" />
                     Delete
                   </button>
                 </div>
+                {c.gbp_status === 'failed' && c.gbp_error && (
+                  <p className="text-xs text-red-600 mt-2 line-clamp-2">{c.gbp_error}</p>
+                )}
               </article>
             );
           })}

@@ -5,6 +5,7 @@ const axios = require('axios');
 const { pool } = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { listAccounts, listLocations, refreshAccessToken } = require('../services/gbp');
+const oauthState = require('../lib/oauthState');
 
 const router = express.Router();
 
@@ -39,9 +40,10 @@ router.post('/team', requireAuth, requireAdmin, async (req, res) => {
 router.post('/team/invite', requireAuth, requireAdmin, async (req, res) => {
   const { email } = req.body;
   const token = uuidv4();
+  const normalizedEmail = email ? String(email).trim().toLowerCase() : null;
   await pool.query(
     'INSERT INTO invites (org_id, email, token) VALUES ($1, $2, $3)',
-    [req.user.orgId, email || null, token]
+    [req.user.orgId, normalizedEmail, token]
   );
   const link = `${process.env.APP_URL}/register?token=${token}`;
   res.json({ link });
@@ -57,16 +59,17 @@ router.delete('/team/:userId', requireAuth, requireAdmin, async (req, res) => {
 });
 
 // GBP OAuth connect (separate from login — admin must be logged in first)
-// Accepts token via query param since browser navigation doesn't send Auth header
+// Accepts token via query param since browser navigation doesn't send Auth header.
+// We immediately exchange it for a short-lived signed state and redirect to Google,
+// so the JWT only appears in this server's URL once (then is bound into the state).
 router.get('/gbp/connect', (req, res) => {
   const jwt = require('jsonwebtoken');
   const token = req.query.token;
-  if (!token) return res.status(401).json({ error: 'Token required' });
+  if (!token) return res.status(401).send('Token required');
   let user;
-  try { user = jwt.verify(token, process.env.JWT_SECRET); } catch { return res.status(401).json({ error: 'Invalid token' }); }
-  if (user.role !== 'admin' && user.role !== 'super_admin') return res.status(403).json({ error: 'Admin only' });
-  const state = JSON.stringify({ orgId: user.orgId, userId: user.id });
-  const stateB64 = Buffer.from(state).toString('base64');
+  try { user = jwt.verify(token, process.env.JWT_SECRET); } catch { return res.status(401).send('Invalid token'); }
+  if (user.role !== 'admin' && user.role !== 'super_admin') return res.status(403).send('Admin only');
+  const state = oauthState.sign({ orgId: user.orgId, userId: user.id, kind: 'gbp' });
   const params = new URLSearchParams({
     client_id: process.env.GOOGLE_CLIENT_ID,
     redirect_uri: `${process.env.APP_URL}/api/admin/gbp/callback`,
@@ -74,7 +77,7 @@ router.get('/gbp/connect', (req, res) => {
     scope: 'https://www.googleapis.com/auth/business.manage',
     access_type: 'offline',
     prompt: 'consent',
-    state: stateB64
+    state
   });
   res.redirect(`https://accounts.google.com/o/oauth2/auth?${params}`);
 });
@@ -84,9 +87,12 @@ router.get('/gbp/callback', async (req, res) => {
   const { code, error, state } = req.query;
   if (error) return res.redirect(`${process.env.APP_URL}/settings?error=google_denied`);
 
-  try {
-    const { orgId } = JSON.parse(Buffer.from(state, 'base64').toString());
+  const payload = oauthState.verify(state);
+  if (!payload || payload.kind !== 'gbp' || !payload.orgId) {
+    return res.redirect(`${process.env.APP_URL}/settings?error=google_failed`);
+  }
 
+  try {
     const tokenRes = await axios.post('https://oauth2.googleapis.com/token', {
       code,
       client_id: process.env.GOOGLE_CLIENT_ID,
@@ -98,7 +104,7 @@ router.get('/gbp/callback', async (req, res) => {
 
     await pool.query(
       'UPDATE organizations SET gbp_access_token = $1, gbp_refresh_token = $2 WHERE id = $3',
-      [access_token, refresh_token, orgId]
+      [access_token, refresh_token, payload.orgId]
     );
 
     res.redirect(`${process.env.APP_URL}/settings?success=google_connected`);
@@ -155,20 +161,27 @@ router.get('/meta/connect', requireAuth, requireAdmin, (req, res) => {
   if (!process.env.META_APP_ID) {
     return res.status(400).json({ error: 'Meta app not configured yet' });
   }
+  const state = oauthState.sign({ orgId: req.user.orgId, userId: req.user.id, kind: 'meta' });
   const params = new URLSearchParams({
     client_id: process.env.META_APP_ID,
     redirect_uri: `${process.env.APP_URL}/api/admin/meta/callback`,
     scope: 'pages_manage_posts,pages_read_engagement,instagram_basic,instagram_content_publish,pages_show_list',
     response_type: 'code',
-    state: req.user.orgId
+    state
   });
   res.redirect(`https://www.facebook.com/v19.0/dialog/oauth?${params}`);
 });
 
 // Meta OAuth callback
 router.get('/meta/callback', async (req, res) => {
-  const { code, state: orgId, error } = req.query;
+  const { code, state, error } = req.query;
   if (error) return res.redirect(`${process.env.APP_URL}/settings?error=meta_denied`);
+
+  const payload = oauthState.verify(state);
+  if (!payload || payload.kind !== 'meta' || !payload.orgId) {
+    return res.redirect(`${process.env.APP_URL}/settings?error=meta_failed`);
+  }
+  const orgId = payload.orgId;
 
   try {
     const tokenRes = await axios.get('https://graph.facebook.com/v19.0/oauth/access_token', {

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../api';
 import { Icon } from '../components/Icons';
@@ -17,10 +17,18 @@ export default function CheckIn() {
   const [aiLoading, setAiLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPreview, setShowPreview] = useState(false);
+  const [businessName, setBusinessName] = useState('');
   const fileInput = useRef();
   const debounceTimer = useRef(null);
   const navigate = useNavigate();
   const role = localStorage.getItem('role');
+
+  useEffect(() => {
+    api.get('/auth/me').then(r => {
+      const org = r.data.org;
+      setBusinessName(org?.gbp_location_name || org?.name || '');
+    }).catch(() => {});
+  }, []);
 
   function onAddressChange(val) {
     setAddress(val);
@@ -213,6 +221,12 @@ export default function CheckIn() {
                 {lat.toFixed(5)}, {lng.toFixed(5)}
               </p>
             )}
+            <p className="text-[11px] text-ink-300 mt-2">
+              Address lookups via{' '}
+              <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className="underline hover:text-ink-500">
+                © OpenStreetMap contributors
+              </a>
+            </p>
           </div>
         </section>
 
@@ -331,7 +345,7 @@ export default function CheckIn() {
                   P
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-semibold text-ink-900">Your Business Name</p>
+                  <p className="text-sm font-semibold text-ink-900">{businessName || 'Your business'}</p>
                   <p className="text-xs text-ink-400">Just now</p>
                 </div>
                 <div className="flex items-center gap-0.5">

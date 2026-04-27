@@ -35,9 +35,14 @@ export default function Team() {
   }
 
   async function generateInvite() {
-    const { data } = await api.post('/admin/team/invite', {});
-    setInviteLink(data.link);
-    setCopied(false);
+    setError('');
+    try {
+      const { data } = await api.post('/admin/team/invite', {});
+      setInviteLink(data.link);
+      setCopied(false);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not generate invite link. Please try again.');
+    }
   }
 
   function copyInvite() {
@@ -70,6 +75,13 @@ export default function Team() {
       </header>
 
       <div className="p-4 space-y-4">
+        {error && !showAdd && (
+          <div className="banner banner-error">
+            <Icon.AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+            <span>{error}</span>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-2">
           <button onClick={() => setShowAdd(!showAdd)} className="btn btn-md bg-brand-600 text-white hover:bg-brand-700">
             <Icon.Plus className="w-4 h-4" />

@@ -3,18 +3,40 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const bcrypt = require('bcryptjs');
-const { pool, initDb } = require('./db');
+const { pool, initDb, isReady } = require('./db');
 const { ensureUploadDir, UPLOAD_DIR } = require('./services/image');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors({ origin: true, credentials: true }));
+if (!process.env.JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET is not set. Refusing to start.');
+  process.exit(1);
+}
+
+app.set('trust proxy', 1); // Railway sits behind a proxy; req.ip should reflect the client.
+
+const allowedOrigins = (process.env.NODE_ENV === 'production')
+  ? [process.env.APP_URL].filter(Boolean)
+  : true;
+app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Serve uploaded files
 app.use('/uploads', express.static(UPLOAD_DIR));
+
+// Health check — Railway uses this to decide if the service is live.
+// Returns 503 until the DB schema has initialized so requests don't hit a half-booted server.
+app.get('/health', async (req, res) => {
+  if (!isReady()) return res.status(503).json({ status: 'starting', db: false });
+  try {
+    await pool.query('SELECT 1');
+    res.json({ status: 'ok', db: true });
+  } catch (err) {
+    res.status(503).json({ status: 'degraded', db: false, error: err.message });
+  }
+});
 
 // API routes
 app.use('/api/auth', require('./routes/auth'));
@@ -56,8 +78,6 @@ async function start() {
   // Then init DB (retry on failure)
   for (let attempt = 1; attempt <= 5; attempt++) {
     try {
-      console.log(`DB init attempt ${attempt}...`);
-      console.log('DB URL host:', process.env.DATABASE_URL?.replace(/\/\/.*@/, '//***@'));
       await initDb();
       await createSuperAdmin();
       console.log('Startup complete');
@@ -67,7 +87,7 @@ async function start() {
       if (attempt < 5) await new Promise(r => setTimeout(r, 3000));
     }
   }
-  console.error('All DB init attempts failed. Server running without DB.');
+  console.error('All DB init attempts failed. /health will report 503.');
 }
 
 start();

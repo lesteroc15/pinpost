@@ -166,6 +166,41 @@ router.get('/:id', requireAuth, async (req, res) => {
   res.json(rows[0]);
 });
 
+// Retry a failed GBP post (admin only)
+router.post('/:id/retry', requireAuth, async (req, res) => {
+  if (req.user.role !== 'admin' && req.user.role !== 'super_admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  const { rows } = await pool.query(
+    'SELECT * FROM checkins WHERE id = $1 AND org_id = $2',
+    [req.params.id, req.user.orgId]
+  );
+  const checkin = rows[0];
+  if (!checkin) return res.status(404).json({ error: 'Not found' });
+  if (checkin.gbp_status === 'posted') return res.status(400).json({ error: 'Already posted to Google.' });
+
+  const orgRes = await pool.query('SELECT * FROM organizations WHERE id = $1', [req.user.orgId]);
+  const org = orgRes.rows[0];
+  if (!org?.gbp_refresh_token || !org?.gbp_location_id) {
+    return res.status(400).json({ error: 'Google Business Profile is not connected. Connect it in Settings first.' });
+  }
+
+  // Mark pending so the UI immediately shows the retry is in flight.
+  await pool.query(
+    'UPDATE checkins SET gbp_status = $1, gbp_error = NULL WHERE id = $2',
+    ['pending', checkin.id]
+  );
+
+  const appUrl = process.env.APP_URL;
+  const primaryPhoto = checkin.collage_path || checkin.photo_paths?.[0];
+  const photoUrl = primaryPhoto ? `${appUrl}/uploads/${primaryPhoto}` : null;
+
+  postToGBP(org, checkin, checkin.description, photoUrl).catch(console.error);
+
+  res.json({ success: true });
+});
+
 // Delete check-in (admin only)
 router.delete('/:id', requireAuth, async (req, res) => {
   if (req.user.role !== 'admin' && req.user.role !== 'super_admin') {
