@@ -1,14 +1,24 @@
 import { useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icons';
 
 export default function AuthCallback() {
-  const [params] = useSearchParams();
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Token + role come in the URL fragment so they never hit server logs.
+    const hash = window.location.hash.startsWith('#')
+      ? window.location.hash.slice(1)
+      : window.location.hash;
+    const params = new URLSearchParams(hash);
     const token = params.get('token');
     const role = params.get('role');
+
+    // Wipe the hash from the URL bar so the token isn't sitting in shared screenshots.
+    if (window.location.hash) {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+
     if (token && role) {
       localStorage.setItem('token', token);
       localStorage.setItem('role', role);

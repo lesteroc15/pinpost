@@ -113,7 +113,9 @@ router.get('/google/callback', async (req, res) => {
     }
 
     const token = makeToken(user);
-    res.redirect(`${process.env.APP_URL}/auth/callback?token=${token}&role=${user.role}`);
+    // Token goes in URL fragment (#), not query string. Fragments are not sent to
+    // the server and don't appear in referrer headers or Railway access logs.
+    res.redirect(`${process.env.APP_URL}/auth/callback#token=${token}&role=${user.role}`);
   } catch (err) {
     console.error('Google OAuth error:', err.message);
     res.redirect(`${process.env.APP_URL}/login?error=oauth_failed`);
