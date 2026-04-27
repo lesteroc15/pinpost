@@ -41,7 +41,7 @@ router.post('/generate-description', requireAuth, async (req, res) => {
 
 // Submit check-in
 router.post('/', requireAuth, upload.array('photos', 10), async (req, res) => {
-  const { address, lat, lng, description, socialDescription } = req.body;
+  const { address, lat, lng, description, socialDescription, labelBeforeAfter } = req.body;
   if (!address || !description) return res.status(400).json({ error: 'Address and description required' });
 
   const orgId = req.user.orgId;
@@ -64,7 +64,8 @@ router.post('/', requireAuth, upload.array('photos', 10), async (req, res) => {
 
   if (photoPaths.length >= 2) {
     const fullPaths = photoPaths.map(f => path.join(UPLOAD_DIR, f));
-    const collageFile = await createCollage(fullPaths);
+    const withLabels = labelBeforeAfter === 'true' || labelBeforeAfter === true;
+    const collageFile = await createCollage(fullPaths, { withLabels });
     collagePath = path.basename(collageFile);
   }
 

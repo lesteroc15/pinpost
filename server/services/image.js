@@ -16,27 +16,25 @@ function labelSvg(text, width) {
   </svg>`;
 }
 
-async function createCollage(imagePaths) {
+async function createCollage(imagePaths, { withLabels = false } = {}) {
   if (imagePaths.length === 1) return imagePaths[0];
 
   const CELL_W = 600;
   const CELL_H = 450;
 
-  // Resize each image to the cell size
-  const before = await sharp(imagePaths[0]).resize(CELL_W, CELL_H, { fit: 'cover' }).toBuffer();
-  const after = await sharp(imagePaths[1]).resize(CELL_W, CELL_H, { fit: 'cover' }).toBuffer();
+  const left = await sharp(imagePaths[0]).resize(CELL_W, CELL_H, { fit: 'cover' }).toBuffer();
+  const right = await sharp(imagePaths[1]).resize(CELL_W, CELL_H, { fit: 'cover' }).toBuffer();
 
-  // Create labels as SVG buffers
-  const beforeLabel = Buffer.from(labelSvg('BEFORE', CELL_W));
-  const afterLabel = Buffer.from(labelSvg('AFTER', CELL_W));
-
-  // Composite label onto each image (bottom-left)
-  const beforeWithLabel = await sharp(before)
-    .composite([{ input: beforeLabel, gravity: 'southwest' }])
-    .toBuffer();
-  const afterWithLabel = await sharp(after)
-    .composite([{ input: afterLabel, gravity: 'southwest' }])
-    .toBuffer();
+  let leftPanel = left;
+  let rightPanel = right;
+  if (withLabels) {
+    leftPanel = await sharp(left)
+      .composite([{ input: Buffer.from(labelSvg('BEFORE', CELL_W)), gravity: 'southwest' }])
+      .toBuffer();
+    rightPanel = await sharp(right)
+      .composite([{ input: Buffer.from(labelSvg('AFTER', CELL_W)), gravity: 'southwest' }])
+      .toBuffer();
+  }
 
   const collageName = `collage_${uuidv4()}.jpg`;
   const collagePath = path.join(UPLOAD_DIR, collageName);
@@ -45,8 +43,8 @@ async function createCollage(imagePaths) {
     create: { width: CELL_W * 2, height: CELL_H, channels: 3, background: { r: 255, g: 255, b: 255 } }
   })
     .composite([
-      { input: beforeWithLabel, top: 0, left: 0 },
-      { input: afterWithLabel, top: 0, left: CELL_W }
+      { input: leftPanel, top: 0, left: 0 },
+      { input: rightPanel, top: 0, left: CELL_W }
     ])
     .jpeg({ quality: 90 })
     .toFile(collagePath);

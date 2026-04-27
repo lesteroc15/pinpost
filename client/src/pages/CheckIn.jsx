@@ -17,6 +17,7 @@ export default function CheckIn() {
   const [aiLoading, setAiLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPreview, setShowPreview] = useState(false);
+  const [labelBeforeAfter, setLabelBeforeAfter] = useState(false);
   const [businessName, setBusinessName] = useState('');
   const fileInput = useRef();
   const debounceTimer = useRef(null);
@@ -120,6 +121,7 @@ export default function CheckIn() {
     form.append('description', description);
     if (lat) form.append('lat', lat);
     if (lng) form.append('lng', lng);
+    form.append('labelBeforeAfter', labelBeforeAfter ? 'true' : 'false');
     photos.forEach(p => form.append('photos', p));
 
     try {
@@ -263,10 +265,15 @@ export default function CheckIn() {
           <div className="card-hd">
             <span className="label !mb-0">Photos <span className="text-ink-400 normal-case tracking-normal font-normal">· up to 10</span></span>
             {photos.length >= 2 && (
-              <span className="pill pill-warn">
+              <button
+                type="button"
+                onClick={() => setLabelBeforeAfter(v => !v)}
+                className={`pill ${labelBeforeAfter ? 'pill-warn' : 'pill-neutral'} cursor-pointer`}
+                title="Adds BEFORE / AFTER labels to the first two photos"
+              >
                 <Icon.Sparkles className="w-3 h-3" />
-                Before / After
-              </span>
+                {labelBeforeAfter ? 'Before / After: On' : 'Mark Before / After'}
+              </button>
             )}
           </div>
           <div className="card-bd space-y-3">
@@ -283,10 +290,10 @@ export default function CheckIn() {
                     >
                       <Icon.X className="w-3.5 h-3.5" />
                     </button>
-                    {i === 0 && photos.length >= 2 && (
+                    {labelBeforeAfter && i === 0 && photos.length >= 2 && (
                       <span className="absolute bottom-1.5 left-1.5 bg-black/65 text-white text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded">Before</span>
                     )}
-                    {i === 1 && (
+                    {labelBeforeAfter && i === 1 && (
                       <span className="absolute bottom-1.5 left-1.5 bg-accent-500 text-white text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded">After</span>
                     )}
                   </div>
