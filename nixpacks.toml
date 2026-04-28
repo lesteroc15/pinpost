@@ -1,0 +1,4 @@
+# Add fontconfig + DejaVu so Sharp/librsvg can render the BEFORE/AFTER text
+# in the collage SVG overlays. Without this the collage shows empty boxes.
+[phases.setup]
+aptPkgs = ['...', 'fontconfig', 'fonts-dejavu-core']

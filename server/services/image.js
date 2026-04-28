@@ -9,10 +9,12 @@ function labelSvg(text, width) {
   const fontSize = 42;
   const padX = 20;
   const padY = 12;
-  // Dark translucent banner with white text in bottom-left
+  // Dark translucent banner with white text in bottom-left.
+  // DejaVu Sans is installed via nixpacks.toml — it's the only sans-serif
+  // we can rely on inside Railway's Linux container.
   return `<svg width="${width}" height="${fontSize + padY * 2 + 24}" xmlns="http://www.w3.org/2000/svg">
     <rect x="${padX}" y="24" rx="6" ry="6" width="${text.length * 24 + padX * 2}" height="${fontSize + padY * 2}" fill="rgba(0,0,0,0.72)" />
-    <text x="${padX * 2}" y="${fontSize + padY + 14}" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="${fontSize}" font-weight="700" fill="white" letter-spacing="1">${text}</text>
+    <text x="${padX * 2}" y="${fontSize + padY + 14}" font-family="DejaVu Sans, sans-serif" font-size="${fontSize}" font-weight="700" fill="white" letter-spacing="1">${text}</text>
   </svg>`;
 }
 
