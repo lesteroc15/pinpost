@@ -17,7 +17,7 @@ export default function CheckIn() {
   const [aiLoading, setAiLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPreview, setShowPreview] = useState(false);
-  const [labelBeforeAfter, setLabelBeforeAfter] = useState(false);
+  const [photoLabels, setPhotoLabels] = useState([]); // null | 'before' | 'after' per photo
   const [businessName, setBusinessName] = useState('');
   const fileInput = useRef();
   const debounceTimer = useRef(null);
@@ -96,6 +96,12 @@ export default function CheckIn() {
     setPhotos(newPhotos);
     const newPreviews = newPhotos.map(f => URL.createObjectURL(f));
     setPreviews(newPreviews);
+    // Extend the labels array to match the new photo count (default null = unlabeled).
+    setPhotoLabels(prev => {
+      const next = [...prev];
+      while (next.length < newPhotos.length) next.push(null);
+      return next.slice(0, newPhotos.length);
+    });
   }
 
   function removePhoto(idx) {
@@ -103,6 +109,17 @@ export default function CheckIn() {
     const newPreviews = previews.filter((_, i) => i !== idx);
     setPhotos(newPhotos);
     setPreviews(newPreviews);
+    setPhotoLabels(prev => prev.filter((_, i) => i !== idx));
+  }
+
+  // Cycle a photo's label: null → 'before' → 'after' → null
+  function cycleLabel(idx) {
+    setPhotoLabels(prev => prev.map((label, i) => {
+      if (i !== idx) return label;
+      if (label === null) return 'before';
+      if (label === 'before') return 'after';
+      return null;
+    }));
   }
 
   function handleReview(e) {
@@ -121,7 +138,7 @@ export default function CheckIn() {
     form.append('description', description);
     if (lat) form.append('lat', lat);
     if (lng) form.append('lng', lng);
-    form.append('labelBeforeAfter', labelBeforeAfter ? 'true' : 'false');
+    form.append('photoLabels', JSON.stringify(photoLabels));
     photos.forEach(p => form.append('photos', p));
 
     try {
@@ -265,39 +282,42 @@ export default function CheckIn() {
           <div className="card-hd">
             <span className="label !mb-0">Photos <span className="text-ink-400 normal-case tracking-normal font-normal">· up to 10</span></span>
             {photos.length >= 2 && (
-              <button
-                type="button"
-                onClick={() => setLabelBeforeAfter(v => !v)}
-                className={`pill ${labelBeforeAfter ? 'pill-warn' : 'pill-neutral'} cursor-pointer`}
-                title="Adds BEFORE / AFTER labels to the first two photos"
-              >
-                <Icon.Sparkles className="w-3 h-3" />
-                {labelBeforeAfter ? 'Before / After: On' : 'Mark Before / After'}
-              </button>
+              <span className="text-xs text-ink-400">Tap a photo's badge to label it</span>
             )}
           </div>
           <div className="card-bd space-y-3">
             {previews.length > 0 && (
               <div className="grid grid-cols-3 gap-2">
-                {previews.map((src, i) => (
-                  <div key={i} className="relative aspect-square">
-                    <img src={src} className="w-full h-full object-cover rounded-xl" />
-                    <button
-                      type="button"
-                      onClick={() => removePhoto(i)}
-                      className="absolute top-1.5 right-1.5 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center active:bg-black/80"
-                      aria-label="Remove photo"
-                    >
-                      <Icon.X className="w-3.5 h-3.5" />
-                    </button>
-                    {labelBeforeAfter && i === 0 && photos.length >= 2 && (
-                      <span className="absolute bottom-1.5 left-1.5 bg-black/65 text-white text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded">Before</span>
-                    )}
-                    {labelBeforeAfter && i === 1 && (
-                      <span className="absolute bottom-1.5 left-1.5 bg-accent-500 text-white text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded">After</span>
-                    )}
-                  </div>
-                ))}
+                {previews.map((src, i) => {
+                  const lbl = photoLabels[i];
+                  const badgeClass = lbl === 'before'
+                    ? 'bg-black/70 text-white'
+                    : lbl === 'after'
+                      ? 'bg-accent-500 text-white'
+                      : 'bg-white/85 text-ink-500 border border-ink-200';
+                  const badgeText = lbl === 'before' ? 'BEFORE' : lbl === 'after' ? 'AFTER' : 'TAG';
+                  return (
+                    <div key={i} className="relative aspect-square">
+                      <img src={src} className="w-full h-full object-cover rounded-xl" />
+                      <button
+                        type="button"
+                        onClick={() => removePhoto(i)}
+                        className="absolute top-1.5 right-1.5 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center active:bg-black/80"
+                        aria-label="Remove photo"
+                      >
+                        <Icon.X className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => cycleLabel(i)}
+                        className={`absolute bottom-1.5 left-1.5 ${badgeClass} text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded`}
+                        aria-label="Cycle Before / After label"
+                      >
+                        {badgeText}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
@@ -317,7 +337,6 @@ export default function CheckIn() {
               type="file"
               accept="image/*"
               multiple
-              capture="environment"
               onChange={handlePhotos}
               className="hidden"
             />

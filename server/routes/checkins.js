@@ -41,7 +41,7 @@ router.post('/generate-description', requireAuth, async (req, res) => {
 
 // Submit check-in
 router.post('/', requireAuth, upload.array('photos', 10), async (req, res) => {
-  const { address, lat, lng, description, socialDescription, labelBeforeAfter } = req.body;
+  const { address, lat, lng, description, socialDescription, photoLabels: photoLabelsRaw } = req.body;
   if (!address || !description) return res.status(400).json({ error: 'Address and description required' });
 
   const orgId = req.user.orgId;
@@ -54,6 +54,12 @@ router.post('/', requireAuth, upload.array('photos', 10), async (req, res) => {
     return res.status(403).json({ error: 'Account suspended. Contact your provider.' });
   }
 
+  // Parse per-photo labels (null | 'before' | 'after'). Sent as a JSON string
+  // because FormData doesn't natively support arrays.
+  let photoLabels = [];
+  try { photoLabels = JSON.parse(photoLabelsRaw || '[]'); } catch { photoLabels = []; }
+  if (!Array.isArray(photoLabels)) photoLabels = [];
+
   const photoPaths = (req.files || []).map(f => f.filename);
 
   // Compress uploaded images
@@ -64,8 +70,7 @@ router.post('/', requireAuth, upload.array('photos', 10), async (req, res) => {
 
   if (photoPaths.length >= 2) {
     const fullPaths = photoPaths.map(f => path.join(UPLOAD_DIR, f));
-    const withLabels = labelBeforeAfter === 'true' || labelBeforeAfter === true;
-    const collageFile = await createCollage(fullPaths, { withLabels });
+    const collageFile = await createCollage(fullPaths, { labels: photoLabels });
     collagePath = path.basename(collageFile);
   }
 

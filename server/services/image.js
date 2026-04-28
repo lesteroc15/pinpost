@@ -16,18 +16,28 @@ function labelSvg(text, width) {
   </svg>`;
 }
 
-async function createCollage(imagePaths, { withLabels = false } = {}) {
+async function createCollage(imagePaths, { labels = [] } = {}) {
   if (imagePaths.length === 1) return imagePaths[0];
 
   const CELL_W = 600;
   const CELL_H = 450;
 
-  const left = await sharp(imagePaths[0]).resize(CELL_W, CELL_H, { fit: 'cover' }).toBuffer();
-  const right = await sharp(imagePaths[1]).resize(CELL_W, CELL_H, { fit: 'cover' }).toBuffer();
+  // If the user explicitly tagged one photo as "before" and another as "after",
+  // use those for the collage and burn the labels into the panels. Otherwise,
+  // default to the first two photos with no labels.
+  const beforeIdx = labels.findIndex(l => l === 'before');
+  const afterIdx = labels.findIndex(l => l === 'after');
+  const tagged = beforeIdx >= 0 && afterIdx >= 0 && beforeIdx !== afterIdx;
+
+  const leftIdx = tagged ? beforeIdx : 0;
+  const rightIdx = tagged ? afterIdx : 1;
+
+  const left = await sharp(imagePaths[leftIdx]).resize(CELL_W, CELL_H, { fit: 'cover' }).toBuffer();
+  const right = await sharp(imagePaths[rightIdx]).resize(CELL_W, CELL_H, { fit: 'cover' }).toBuffer();
 
   let leftPanel = left;
   let rightPanel = right;
-  if (withLabels) {
+  if (tagged) {
     leftPanel = await sharp(left)
       .composite([{ input: Buffer.from(labelSvg('BEFORE', CELL_W)), gravity: 'southwest' }])
       .toBuffer();
