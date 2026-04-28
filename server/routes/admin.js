@@ -22,16 +22,59 @@ router.get('/team', requireAuth, requireAdmin, async (req, res) => {
 router.post('/team', requireAuth, requireAdmin, async (req, res) => {
   const { email, name, password } = req.body;
   if (!email || !name || !password) return res.status(400).json({ error: 'All fields required' });
+  if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
 
   const hash = await bcrypt.hash(password, 10);
   try {
     const { rows } = await pool.query(
-      'INSERT INTO users (org_id, email, password_hash, name, role) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, name, role',
+      'INSERT INTO users (org_id, email, password_hash, name, role) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, name, role, is_active, created_at',
       [req.user.orgId, email.toLowerCase(), hash, name, 'worker']
     );
     res.json(rows[0]);
   } catch (err) {
     if (err.code === '23505') return res.status(400).json({ error: 'Email already exists' });
+    throw err;
+  }
+});
+
+// Update worker (name, email, password, is_active)
+router.patch('/team/:userId', requireAuth, requireAdmin, async (req, res) => {
+  const { name, email, password, is_active } = req.body;
+
+  // Confirm the target row belongs to this admin's org and is a worker
+  const target = await pool.query(
+    'SELECT id, role FROM users WHERE id = $1 AND org_id = $2',
+    [req.params.userId, req.user.orgId]
+  );
+  if (!target.rows.length) return res.status(404).json({ error: 'Not found' });
+  if (target.rows[0].role !== 'worker') return res.status(403).json({ error: 'Cannot edit non-worker accounts.' });
+
+  const updates = [];
+  const values = [];
+  let i = 1;
+  if (typeof name === 'string' && name.trim()) { updates.push(`name = $${i++}`); values.push(name.trim()); }
+  if (typeof email === 'string' && email.trim()) {
+    const e = email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return res.status(400).json({ error: 'Invalid email.' });
+    updates.push(`email = $${i++}`); values.push(e);
+  }
+  if (typeof password === 'string' && password.length > 0) {
+    if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+    updates.push(`password_hash = $${i++}`); values.push(await bcrypt.hash(password, 10));
+  }
+  if (typeof is_active === 'boolean') { updates.push(`is_active = $${i++}`); values.push(is_active); }
+
+  if (!updates.length) return res.status(400).json({ error: 'Nothing to update.' });
+
+  values.push(req.params.userId, req.user.orgId);
+  try {
+    const { rows } = await pool.query(
+      `UPDATE users SET ${updates.join(', ')} WHERE id = $${i++} AND org_id = $${i} RETURNING id, email, name, role, is_active, created_at`,
+      values
+    );
+    res.json(rows[0]);
+  } catch (err) {
+    if (err.code === '23505') return res.status(400).json({ error: 'That email is already in use.' });
     throw err;
   }
 });

@@ -13,6 +13,11 @@ export default function Team() {
   const [inviteLink, setInviteLink] = useState('');
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
+  const [editingId, setEditingId] = useState(null);
+  const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editPassword, setEditPassword] = useState('');
+  const [editLoading, setEditLoading] = useState(false);
 
   useEffect(() => {
     api.get('/admin/team').then(r => setMembers(r.data));
@@ -52,8 +57,49 @@ export default function Team() {
   }
 
   async function removeMember(id) {
+    if (!confirm('Deactivate this worker? They will no longer be able to sign in. You can reactivate later.')) return;
     await api.delete(`/admin/team/${id}`);
     setMembers(members.map(m => m.id === id ? { ...m, is_active: false } : m));
+  }
+
+  async function reactivateMember(id) {
+    try {
+      const { data } = await api.patch(`/admin/team/${id}`, { is_active: true });
+      setMembers(members.map(m => m.id === id ? data : m));
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not reactivate.');
+    }
+  }
+
+  function startEdit(m) {
+    setEditingId(m.id);
+    setEditName(m.name || '');
+    setEditEmail(m.email || '');
+    setEditPassword('');
+    setError('');
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditName('');
+    setEditEmail('');
+    setEditPassword('');
+  }
+
+  async function saveEdit(id) {
+    setEditLoading(true);
+    setError('');
+    try {
+      const body = { name: editName, email: editEmail };
+      if (editPassword) body.password = editPassword;
+      const { data } = await api.patch(`/admin/team/${id}`, body);
+      setMembers(members.map(m => m.id === id ? data : m));
+      cancelEdit();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not save changes.');
+    } finally {
+      setEditLoading(false);
+    }
   }
 
   return (
@@ -125,7 +171,44 @@ export default function Team() {
         )}
 
         <div className="space-y-2">
-          {members.map(m => (
+          {members.map(m => editingId === m.id ? (
+            <div key={m.id} className="card card-pad space-y-3">
+              <h3 className="h2">Edit worker</h3>
+              {error && (
+                <div className="banner banner-error">
+                  <Icon.AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                  <span>{error}</span>
+                </div>
+              )}
+              <div>
+                <label className="label">Name</label>
+                <input className="input-field" value={editName} onChange={e => setEditName(e.target.value)} />
+              </div>
+              <div>
+                <label className="label">Email</label>
+                <input className="input-field" type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} />
+              </div>
+              <div>
+                <label className="label">New password <span className="text-ink-400 font-normal normal-case tracking-normal">· leave blank to keep current</span></label>
+                <input
+                  className="input-field"
+                  type="password"
+                  placeholder="Min 6 characters"
+                  value={editPassword}
+                  onChange={e => setEditPassword(e.target.value)}
+                  minLength={6}
+                />
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => saveEdit(m.id)} disabled={editLoading} className="btn-primary flex-1">
+                  {editLoading ? 'Saving…' : 'Save'}
+                </button>
+                <button onClick={cancelEdit} disabled={editLoading} className="btn-secondary flex-1">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
             <div key={m.id} className="card card-pad flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-white flex items-center justify-center font-semibold text-sm flex-shrink-0">
                 {(m.name || '?').slice(0, 1).toUpperCase()}
@@ -138,11 +221,24 @@ export default function Team() {
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 {!m.is_active && <span className="pill pill-neutral">Deactivated</span>}
-                {m.is_active && m.role === 'worker' && (
-                  <button onClick={() => removeMember(m.id)} className="btn-danger">
-                    <Icon.Trash className="w-3.5 h-3.5" />
-                    Remove
-                  </button>
+                {m.role === 'worker' && (
+                  <>
+                    <button onClick={() => startEdit(m)} className="btn-ghost text-xs">
+                      <Icon.Settings className="w-3.5 h-3.5" />
+                      Edit
+                    </button>
+                    {m.is_active ? (
+                      <button onClick={() => removeMember(m.id)} className="btn-danger">
+                        <Icon.Trash className="w-3.5 h-3.5" />
+                        Remove
+                      </button>
+                    ) : (
+                      <button onClick={() => reactivateMember(m.id)} className="btn-ghost text-xs text-brand-700">
+                        <Icon.Check className="w-3.5 h-3.5" />
+                        Reactivate
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </div>
