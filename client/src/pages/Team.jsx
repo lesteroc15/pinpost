@@ -56,6 +56,19 @@ export default function Team() {
     setTimeout(() => setCopied(false), 2000);
   }
 
+  async function shareInvite() {
+    const payload = {
+      title: 'PinPost worker invite',
+      text: 'You\'ve been invited to join your team on PinPost. Tap the link to set up your account:',
+      url: inviteLink
+    };
+    if (navigator.share) {
+      try { await navigator.share(payload); } catch { /* user cancelled — no-op */ }
+    } else {
+      copyInvite();
+    }
+  }
+
   async function removeMember(id) {
     if (!confirm('Deactivate this worker? They will no longer be able to sign in. You can reactivate later.')) return;
     await api.delete(`/admin/team/${id}`);
@@ -143,12 +156,18 @@ export default function Team() {
           <div className="card card-pad">
             <p className="label !mb-2">Share with your worker</p>
             <div className="bg-ink-50 border border-ink-100 rounded-xl p-3 break-all text-xs text-ink-700 font-mono">{inviteLink}</div>
-            <div className="flex items-center justify-between mt-3">
-              <button onClick={copyInvite} className="btn-ghost text-sm">
+            <div className="grid grid-cols-2 gap-2 mt-3">
+              {typeof navigator !== 'undefined' && 'share' in navigator && (
+                <button onClick={shareInvite} className="btn btn-md bg-brand-600 text-white hover:bg-brand-700">
+                  <Icon.Send className="w-4 h-4" />
+                  Share
+                </button>
+              )}
+              <button onClick={copyInvite} className={`btn btn-md bg-white text-ink-700 border border-ink-200 hover:bg-ink-50 ${typeof navigator === 'undefined' || !('share' in navigator) ? 'col-span-2' : ''}`}>
                 {copied ? <><Icon.Check className="w-4 h-4" /> Copied!</> : <><Icon.Copy className="w-4 h-4" /> Copy link</>}
               </button>
-              <span className="text-xs text-ink-400">Expires in 7 days</span>
             </div>
+            <p className="text-xs text-ink-400 mt-2 text-right">Expires in 7 days</p>
           </div>
         )}
 
