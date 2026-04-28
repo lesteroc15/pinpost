@@ -23,6 +23,7 @@ export default function Dashboard() {
   const [checkins, setCheckins] = useState([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState('list');
+  const [selected, setSelected] = useState(null);
 
   function load() {
     api.get('/checkins').then(r => { setCheckins(r.data); setLoading(false); }).catch(() => setLoading(false));
@@ -149,7 +150,11 @@ export default function Dashboard() {
           ) : checkins.map(c => {
             const s = STATUS[c.gbp_status] || STATUS.pending;
             return (
-              <article key={c.id} className="card card-pad">
+              <article
+                key={c.id}
+                onClick={() => setSelected(c)}
+                className="card card-pad cursor-pointer hover:shadow-card-md transition-shadow"
+              >
                 <div className="flex gap-3">
                   {(c.collage_path || c.photo_paths?.[0]) && (
                     <img
@@ -171,14 +176,14 @@ export default function Dashboard() {
                   </span>
                   {(c.gbp_status === 'failed' || c.gbp_status === 'skipped') && (
                     <button
-                      onClick={() => retryCheckin(c.id)}
+                      onClick={(e) => { e.stopPropagation(); retryCheckin(c.id); }}
                       className="text-xs font-semibold text-brand-700 hover:text-brand-800 flex items-center gap-1"
                     >
                       <Icon.Loader className="w-3.5 h-3.5" />
                       Retry
                     </button>
                   )}
-                  <button onClick={() => deleteCheckin(c.id)} className="ml-auto text-xs text-ink-400 hover:text-red-600 flex items-center gap-1">
+                  <button onClick={(e) => { e.stopPropagation(); deleteCheckin(c.id); }} className="ml-auto text-xs text-ink-400 hover:text-red-600 flex items-center gap-1">
                     <Icon.Trash className="w-3.5 h-3.5" />
                     Delete
                   </button>
@@ -191,6 +196,124 @@ export default function Dashboard() {
           })}
         </div>
       )}
+
+      {selected && (() => {
+        const s = STATUS[selected.gbp_status] || STATUS.pending;
+        return (
+          <div
+            className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+            onClick={() => setSelected(null)}
+          >
+            <div
+              className="bg-white w-full max-w-lg max-h-[95vh] sm:rounded-2xl overflow-y-auto shadow-card-lg"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="sticky top-0 bg-white px-5 py-3 border-b border-ink-100 flex items-center justify-between z-10">
+                <p className="label !mb-0">Check-in details</p>
+                <button onClick={() => setSelected(null)} className="text-ink-400 hover:text-ink-700" aria-label="Close">
+                  <Icon.X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-4">
+                {selected.collage_path && (
+                  <div>
+                    <p className="label">Collage (posted to Google)</p>
+                    <img
+                      src={`/uploads/${selected.collage_path}`}
+                      className="w-full rounded-xl border border-ink-100"
+                      alt="Before / After collage"
+                    />
+                  </div>
+                )}
+
+                {selected.photo_paths?.length > 0 && (
+                  <div>
+                    <p className="label">All photos ({selected.photo_paths.length})</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {selected.photo_paths.map((p, i) => (
+                        <a
+                          key={p}
+                          href={`/uploads/${p}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block aspect-square"
+                        >
+                          <img
+                            src={`/uploads/${p}`}
+                            className="w-full h-full object-cover rounded-xl bg-ink-100"
+                            alt={`Photo ${i + 1}`}
+                          />
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <p className="label">Address</p>
+                  <p className="text-sm text-ink-900">{selected.address}</p>
+                  {selected.lat && selected.lng && (
+                    <p className="text-xs text-ink-400 mt-1 flex items-center gap-1">
+                      <Icon.MapPin className="w-3 h-3" />
+                      {Number(selected.lat).toFixed(5)}, {Number(selected.lng).toFixed(5)}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <p className="label">Description</p>
+                  <p className="text-sm text-ink-700 leading-relaxed whitespace-pre-wrap">{selected.description}</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="label">Worker</p>
+                    <p className="text-sm text-ink-700">{selected.worker_name || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="label">Submitted</p>
+                    <p className="text-sm text-ink-700">{new Date(selected.created_at).toLocaleString()}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="label">Google Business Profile</p>
+                  <span className={`pill ${s.cls}`}>
+                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6" /></svg>
+                    {s.label}
+                  </span>
+                  {selected.gbp_error && (
+                    <p className="text-xs text-red-600 mt-2 leading-relaxed">{selected.gbp_error}</p>
+                  )}
+                  {selected.gbp_post_id && (
+                    <p className="text-xs text-ink-400 mt-2 break-all">Post ID: {selected.gbp_post_id}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="px-5 pb-5 space-y-2 border-t border-ink-100 pt-4">
+                {(selected.gbp_status === 'failed' || selected.gbp_status === 'skipped') && (
+                  <button
+                    onClick={() => { retryCheckin(selected.id); setSelected(null); }}
+                    className="btn-primary"
+                  >
+                    <Icon.Loader className="w-5 h-5" />
+                    Retry post to Google
+                  </button>
+                )}
+                <button
+                  onClick={() => { deleteCheckin(selected.id); setSelected(null); }}
+                  className="btn-secondary text-red-600"
+                >
+                  <Icon.Trash className="w-5 h-5" />
+                  Delete check-in
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
